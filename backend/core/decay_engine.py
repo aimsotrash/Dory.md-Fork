@@ -1,10 +1,19 @@
 """
 Ebbinghaus forgetting curve engine.
 
-Formula:  R(t) = e^( -t / (S * k) )
-  t = hours elapsed since last access + any projection offset
-  S = stability factor = 1.0 + 0.5 * ln(1 + access_count)
-  k = complexity modifier = 0.5 + 1.5 * complexity_score  (range 0.5–2.0)
+Formula:  R(t) = e^( -t / (S * k * BASE_HOURS) )
+  t          = hours elapsed since last access + any projection offset
+  S          = stability factor = 1.0 + 0.5 * ln(1 + access_count)
+               (dimensionless, range 1.0 – ~3.5)
+  k          = complexity modifier = 0.5 + 1.5 * complexity_score
+               (range 0.5 – 2.0; higher k = slower decay for complex content)
+  BASE_HOURS = 216 h (9 days) — characteristic half-life for a brand-new note.
+               Aligns with the intelligence branch which uses stability_S in days * 24.
+
+Typical behaviour:
+  - Note accessed 3 days ago, 3 reviews  → R ≈ 0.87 (strong)
+  - Note accessed 10 days ago, 1 review  → R ≈ 0.44 (weak)
+  - Note accessed 30 days ago, 0 reviews → R ≈ 0.04 (critical)
 
 Two entry points:
   calculate_retention()        — single chunk, used by fading feed / search
@@ -15,6 +24,8 @@ import math
 from datetime import datetime, timezone
 
 import numpy as np
+
+_BASE_HOURS = 24 * 9  # 216 hours — 9-day characteristic time for a new, unreviewed note
 
 
 def _elapsed_hours(last_accessed: datetime) -> float:
@@ -41,7 +52,7 @@ def calculate_retention(
     t = _elapsed_hours(last_accessed) + offset_hours
     S = stability(access_count)
     k = complexity_modifier(complexity_score)
-    return float(math.exp(-t / (S * k)))
+    return float(math.exp(-t / (S * k * _BASE_HOURS)))
 
 
 def calculate_retention_batch(
@@ -61,7 +72,7 @@ def calculate_retention_batch(
     scores = np.clip(np.array(complexity_scores, dtype=np.float64), 0.0, 1.0)
     S = 1.0 + 0.5 * np.log1p(counts)
     k = 0.5 + 1.5 * scores
-    return np.exp(-t / (S * k))
+    return np.exp(-t / (S * k * _BASE_HOURS))
 
 
 def classify_retention(r: float) -> str:

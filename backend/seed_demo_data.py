@@ -27,7 +27,7 @@ from core.embeddings import embed_texts, warm_model
 from services.chroma_service import add_chunks
 from database.db import DEFAULT_USER_ID
 
-BRAIN_BACKUP_DIR = Path(__file__).parent.parent / "brain-backup"
+BRAIN_BACKUP_DIR = Path(__file__).parent.parent.parent / "brain-backup"
 MAX_FILES = 60          # cap to keep demo dataset fast (~200 chunks)
 SEED = 42
 
@@ -103,7 +103,7 @@ def seed():
         ]
         add_chunks(chunk_ids, embeddings, metadatas)
         total_chunks += len(chunk_ids)
-        print(f"  ✓ {md_file.name} → {len(chunk_ids)} chunks  (created {created_days_ago}d ago, {access_count} reviews)")
+        print(f"  OK {md_file.name} -> {len(chunk_ids)} chunks  (created {created_days_ago}d ago, {access_count} reviews)")
 
     print(f"\nDone. {total_chunks} chunks seeded from {len(md_files)} notes.")
     print("Start the server and open the Health Dashboard — drag the Time Machine slider to see decay.")
