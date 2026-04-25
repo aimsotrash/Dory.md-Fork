@@ -2,6 +2,7 @@
 frontend/node_modules/
 frontend/dist/
 frontend/.env
+frontend/.vite/
 
 # Backend
 backend/.env
@@ -14,8 +15,35 @@ backend/*.db
 backend/*.db-wal
 backend/*.db-shm
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+build/
+*.egg
+.venv/
+venv/
+env/
+chroma_db/
+
+# Environment
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
 # Misc
 lecture pdf/
 lecture pdf.zip
-*.pyc
-__pycache__/
+test_groq_key.py
+demo_chunks.json
+*.extracted.txt
