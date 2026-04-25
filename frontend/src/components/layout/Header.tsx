@@ -1,7 +1,8 @@
-import { Brain, Bell, Settings, Plus, Zap } from 'lucide-react';
+import { Brain, Bell, Settings, Plus, Zap, Upload } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { ingestText } from '@/lib/api';
+import { UploadModal } from '@/components/upload/UploadModal';
 
 interface HeaderProps {
   hasDiscovery?: boolean;
@@ -10,6 +11,7 @@ interface HeaderProps {
 
 export function Header({ hasDiscovery, onDiscoveryClick }: HeaderProps) {
   const [showIngest, setShowIngest] = useState(false);
+  const [showUpload, setShowUpload] = useState(false);
   const [ingestContent, setIngestContent] = useState('');
   const [ingesting, setIngesting] = useState(false);
   const [ingestSuccess, setIngestSuccess] = useState(false);
@@ -48,6 +50,16 @@ export function Header({ hasDiscovery, onDiscoveryClick }: HeaderProps) {
           </Link>
 
           <div className="flex items-center gap-2">
+            {/* Upload files */}
+            <button
+              onClick={() => setShowUpload(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-cosmos-800 hover:bg-cosmos-700 border border-cosmos-700 hover:border-cosmos-600 text-slate-300 hover:text-white rounded-lg text-xs font-medium transition-all duration-200"
+            >
+              <Upload size={13} />
+              Upload
+            </button>
+
+            {/* Add memory (text) */}
             <button
               onClick={() => setShowIngest(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-nebula-500/20 hover:bg-nebula-500/30 border border-nebula-500/40 text-nebula-300 rounded-lg text-xs font-medium transition-all duration-200 hover:glow-nebula"
@@ -56,6 +68,7 @@ export function Header({ hasDiscovery, onDiscoveryClick }: HeaderProps) {
               Add memory
             </button>
 
+            {/* Discovery bell */}
             <button
               onClick={onDiscoveryClick}
               className={`relative p-2 rounded-lg transition-all duration-200 ${
@@ -70,9 +83,11 @@ export function Header({ hasDiscovery, onDiscoveryClick }: HeaderProps) {
               )}
             </button>
 
+            {/* Settings */}
             <Link
               to="/settings"
               className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-cosmos-800 transition-all duration-200"
+              title="Settings"
             >
               <Settings size={16} />
             </Link>
@@ -80,6 +95,7 @@ export function Header({ hasDiscovery, onDiscoveryClick }: HeaderProps) {
         </div>
       </header>
 
+      {/* Text ingest modal */}
       {showIngest && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-cosmos-950/80 backdrop-blur-sm animate-fade-in">
           <div className="glass-card w-full max-w-lg p-6 space-y-4 border-nebula-500/30">
@@ -102,30 +118,42 @@ export function Header({ hasDiscovery, onDiscoveryClick }: HeaderProps) {
               onChange={(e) => setIngestContent(e.target.value)}
               autoFocus
             />
-            <div className="flex justify-end gap-2">
-              <button className="btn-secondary" onClick={() => setShowIngest(false)}>
-                Cancel
-              </button>
+            <div className="flex items-center justify-between gap-2">
               <button
-                className="btn-primary flex items-center gap-2"
-                onClick={handleIngest}
-                disabled={ingesting || !ingestContent.trim()}
+                className="btn-ghost flex items-center gap-1.5 text-xs"
+                onClick={() => { setShowIngest(false); setShowUpload(true); }}
               >
-                {ingesting ? (
-                  <>
-                    <span className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
-                    Processing...
-                  </>
-                ) : ingestSuccess ? (
-                  '✓ Saved!'
-                ) : (
-                  'Remember this'
-                )}
+                <Upload size={12} />
+                Upload a file instead
               </button>
+              <div className="flex gap-2">
+                <button className="btn-secondary" onClick={() => setShowIngest(false)}>
+                  Cancel
+                </button>
+                <button
+                  className="btn-primary flex items-center gap-2"
+                  onClick={handleIngest}
+                  disabled={ingesting || !ingestContent.trim()}
+                >
+                  {ingesting ? (
+                    <>
+                      <span className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
+                      Processing...
+                    </>
+                  ) : ingestSuccess ? (
+                    '✓ Saved!'
+                  ) : (
+                    'Remember this'
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Upload modal */}
+      {showUpload && <UploadModal onClose={() => setShowUpload(false)} />}
     </>
   );
 }

@@ -4,6 +4,7 @@ import { Dashboard } from '@/pages/Dashboard';
 import { SearchPage } from '@/pages/SearchPage';
 import { QuizPage } from '@/pages/QuizPage';
 import { LibraryPage } from '@/pages/LibraryPage';
+import { SettingsPage } from '@/pages/SettingsPage';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 
 export default function App() {
@@ -15,6 +16,7 @@ export default function App() {
           <Route path="/search" element={<SearchPage />} />
           <Route path="/quiz" element={<QuizPage />} />
           <Route path="/library" element={<LibraryPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route
             path="*"
             element={

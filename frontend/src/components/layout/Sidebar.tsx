@@ -7,6 +7,7 @@ import {
   TrendingDown,
   Activity,
   ChevronRight,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -15,6 +16,7 @@ const navItems = [
   { to: '/search', label: 'Search', icon: Search },
   { to: '/quiz', label: 'Quiz Mode', icon: BrainCircuit },
   { to: '/library', label: 'Library', icon: BookOpen },
+  { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
 const stats = [
