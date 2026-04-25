@@ -24,7 +24,7 @@ function CustomTooltipContent({ active, payload }: { active?: boolean; payload?:
   const { stat } = node;
   const color = retentionToColor(stat.avg_retention);
   return (
-    <div className="glass-card px-3 py-2.5 text-xs space-y-1.5 min-w-[160px] border-cosmos-600">
+    <div className="px-3 py-2.5 text-xs space-y-1.5 min-w-[160px] rounded-xl" style={{ background:'rgba(5,8,16,0.95)', border:'1px solid rgba(124,58,237,0.3)', boxShadow:'0 20px 60px rgba(0,0,0,0.6)' }}>
       <p className="font-semibold text-slate-200 capitalize">{stat.name}</p>
       <div className="flex justify-between gap-4">
         <span className="text-slate-500">Retention</span>
@@ -172,7 +172,7 @@ export function KnowledgeHealthTreemap({ timeOffsetHours }: KnowledgeHealthTreem
   const critical = health.categories.filter((c) => c.urgency === 'high');
 
   return (
-    <div className="glass-card p-5 space-y-4">
+    <div className="gcard p-5 space-y-4">
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-sm font-semibold text-slate-200">Knowledge Health</h2>
@@ -199,7 +199,7 @@ export function KnowledgeHealthTreemap({ timeOffsetHours }: KnowledgeHealthTreem
       </div>
 
       {critical.length > 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-900/20 border border-red-900/30">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background:'rgba(220,38,38,0.08)', border:'1px solid rgba(220,38,38,0.2)' }}>
           <Info size={12} className="text-red-400 shrink-0" />
           <p className="text-xs text-red-300">
             <span className="font-semibold">{critical.map((c) => c.name).join(', ')}</span>

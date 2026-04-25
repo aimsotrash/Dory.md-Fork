@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Clock, FileText, Tag, TrendingDown, Star } from 'lucide-react';
 import { retentionToColor, retentionToLabel, categoryColors } from '@/styles/theme';
 import { formatRetentionPct, formatRelativeTime, truncate } from '@/lib/utils';
@@ -13,104 +14,155 @@ interface ChunkCardProps {
 }
 
 export function ChunkCard({ chunk, score, highlight, compact, className }: ChunkCardProps) {
+  const ref = useRef<HTMLDivElement>(null);
   const retention = chunk.retention ?? 0.5;
   const color = retentionToColor(retention);
   const label = retentionToLabel(retention);
   const catColor = categoryColors[chunk.category] ?? '#64748b';
 
+  function onMouseMove(e: React.MouseEvent<HTMLDivElement>) {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width - 0.5;
+    const y = (e.clientY - rect.top) / rect.height - 0.5;
+    el.style.transform = `perspective(1000px) rotateY(${x * 5}deg) rotateX(${-y * 5}deg)`;
+    const mx = ((e.clientX - rect.left) / rect.width) * 100;
+    const my = ((e.clientY - rect.top) / rect.height) * 100;
+    el.style.setProperty('--mx', `${mx}%`);
+    el.style.setProperty('--my', `${my}%`);
+  }
+
+  function onMouseLeave() {
+    if (ref.current) ref.current.style.transform = '';
+  }
+
   return (
     <div
-      className={cn(
-        'glass-card-hover p-4 group cursor-pointer animate-fade-in',
-        className
-      )}
-      style={{ '--accent': color } as React.CSSProperties}
+      ref={ref}
+      onMouseMove={onMouseMove}
+      onMouseLeave={onMouseLeave}
+      className={cn('animate-fade-in', className)}
+      style={{ transition: 'transform 0.18s ease', willChange: 'transform' }}
     >
-      <div className="flex items-start gap-3">
+      <div
+        className="gcard gcard-spotlight relative overflow-hidden cursor-pointer"
+        style={{
+          borderColor: `rgba(255,255,255,0.06)`,
+          transition: 'border-color 0.25s ease, box-shadow 0.25s ease',
+        }}
+        onMouseEnter={(e) => {
+          const el = e.currentTarget;
+          el.style.borderColor = `${color}35`;
+          el.style.boxShadow = `0 0 0 1px ${color}10 inset, 0 1px 0 rgba(255,255,255,0.08) inset, 0 25px 70px rgba(0,0,0,0.5), 0 0 25px ${color}15`;
+        }}
+        onMouseLeave={(e) => {
+          const el = e.currentTarget;
+          el.style.borderColor = '';
+          el.style.boxShadow = '';
+        }}
+      >
+        {/* Colored top accent bar */}
         <div
-          className="shrink-0 w-1 rounded-full self-stretch transition-all duration-300"
+          className="absolute top-0 left-0 right-0 h-[2px] rounded-t-[16px]"
           style={{
-            background: `linear-gradient(180deg, ${color} 0%, ${color}40 100%)`,
-            boxShadow: `0 0 6px ${color}60`,
+            background: `linear-gradient(90deg, ${color}00 0%, ${color} 30%, ${color}80 70%, ${color}00 100%)`,
           }}
         />
 
-        <div className="flex-1 min-w-0 space-y-2">
-          <div className="flex items-start justify-between gap-2">
+        <div className={cn('p-4', compact ? 'p-3' : 'p-5')}>
+          {/* Header row */}
+          <div className="flex items-center justify-between gap-2 mb-3">
             <div className="flex items-center gap-2 flex-wrap">
               <span
-                className="tag font-medium"
-                style={{ color: catColor, background: `${catColor}18`, border: `1px solid ${catColor}35` }}
+                className="tag capitalize font-semibold"
+                style={{
+                  color: catColor,
+                  background: `${catColor}15`,
+                  border: `1px solid ${catColor}30`,
+                }}
               >
                 {chunk.category}
               </span>
               {score !== undefined && (
-                <span className="tag text-pulsar-400 bg-pulsar-500/10 border border-pulsar-500/20">
-                  <Star size={9} /> {Math.round(score * 100)}% match
+                <span className="tag text-pulsar-300 bg-pulsar-500/10 border border-pulsar-500/20">
+                  <Star size={9} /> {Math.round(score * 100)}%
                 </span>
               )}
             </div>
+
+            {/* Retention pill */}
             <div
-              className="shrink-0 text-xs font-mono font-semibold px-2 py-0.5 rounded-full border"
+              className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-mono font-bold"
               style={{
                 color,
                 borderColor: `${color}40`,
-                background: `${color}15`,
+                background: `${color}12`,
+                boxShadow: `0 0 10px ${color}25`,
               }}
             >
-              {formatRetentionPct(retention)} · {label}
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: color, boxShadow: `0 0 4px ${color}` }}
+              />
+              {formatRetentionPct(retention)}
+              <span className="opacity-60">·</span>
+              {label}
             </div>
           </div>
 
-          {highlight ? (
-            <p
-              className="text-sm text-slate-300 leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: highlight }}
-            />
-          ) : (
-            <p className="text-sm text-slate-300 leading-relaxed">
-              {compact ? truncate(chunk.content, 120) : chunk.content}
-            </p>
-          )}
+          {/* Content */}
+          <p className={cn('text-slate-300 leading-relaxed mb-3', compact ? 'text-xs line-clamp-2' : 'text-sm')}>
+            {highlight ? (
+              <span dangerouslySetInnerHTML={{ __html: highlight }} />
+            ) : (
+              compact ? truncate(chunk.content, 110) : chunk.content
+            )}
+          </p>
 
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-1.5 text-xs text-slate-600">
-              <FileText size={11} />
-              <span className="truncate max-w-[160px]">{chunk.source_name}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-600">
-              <Clock size={11} />
-              <span>{formatRelativeTime(chunk.last_accessed)}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-600">
-              <TrendingDown size={11} />
-              <span>{chunk.access_count}× reviewed</span>
-            </div>
+          {/* Meta row */}
+          <div className="flex items-center gap-4 flex-wrap mb-3">
+            {[
+              { icon: FileText, text: chunk.source_name, max: 140 },
+              { icon: Clock, text: formatRelativeTime(chunk.last_accessed) },
+              { icon: TrendingDown, text: `${chunk.access_count}× reviewed` },
+            ].map(({ icon: Icon, text, max }) => (
+              <div key={text} className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                <Icon size={10} />
+                <span className={max ? `truncate max-w-[${max}px]` : ''}>{text}</span>
+              </div>
+            ))}
           </div>
 
-          {chunk.tags && chunk.tags.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <Tag size={10} className="text-slate-600" />
+          {/* Tags */}
+          {!compact && chunk.tags && chunk.tags.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap mb-3">
+              <Tag size={10} className="text-slate-700" />
               {chunk.tags.map((t) => (
-                <span key={t} className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors cursor-pointer">
+                <span
+                  key={t}
+                  className="text-[10px] text-slate-600 hover:text-nebula-400 transition-colors cursor-pointer font-mono"
+                >
                   #{t}
                 </span>
               ))}
             </div>
           )}
 
-          <div className="flex items-center gap-2 pt-1">
-            <div className="flex-1 h-1 bg-cosmos-700 rounded-full overflow-hidden">
+          {/* Retention bar */}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 retention-bar-track">
               <div
-                className="h-full rounded-full transition-all duration-500"
+                className="retention-bar-fill"
                 style={{
                   width: `${retention * 100}%`,
-                  background: `linear-gradient(90deg, ${color}90 0%, ${color} 100%)`,
-                  boxShadow: `0 0 6px ${color}50`,
+                  background: `linear-gradient(90deg, ${color}60, ${color})`,
+                  boxShadow: `0 0 8px ${color}60`,
+                  color,
                 }}
               />
             </div>
-            <span className="text-[10px] font-mono text-slate-600 w-8 text-right">
+            <span className="text-[10px] font-mono text-slate-600 w-8 text-right tabular-nums">
               {formatRetentionPct(retention)}
             </span>
           </div>

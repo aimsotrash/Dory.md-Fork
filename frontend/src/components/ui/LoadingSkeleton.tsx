@@ -17,7 +17,7 @@ export function Skeleton({ className }: SkeletonProps) {
 
 export function CardSkeleton() {
   return (
-    <div className="glass-card p-4 space-y-3">
+    <div className="gcard p-4 space-y-3">
       <Skeleton className="h-4 w-3/4" />
       <Skeleton className="h-3 w-full" />
       <Skeleton className="h-3 w-5/6" />
@@ -31,7 +31,7 @@ export function CardSkeleton() {
 
 export function TreemapSkeleton() {
   return (
-    <div className="glass-card p-4 space-y-3">
+    <div className="gcard p-4 space-y-3">
       <Skeleton className="h-5 w-40" />
       <div className="grid grid-cols-2 gap-2 mt-4">
         <Skeleton className="h-32 rounded-lg" />
