@@ -2,6 +2,7 @@ import { type ReactNode, useRef } from 'react';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import { DiscoveryCard } from '@/components/discovery/DiscoveryCard';
+import { AnimatedBackground } from '@/components/ui/AnimatedBackground';
 import { useDiscoveryPolling } from '@/lib/useDiscoveryPolling';
 
 interface AppShellProps {
@@ -17,24 +18,25 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header
-        hasDiscovery={discovery !== null}
-        onDiscoveryClick={scrollToDiscovery}
-      />
+    <div className="min-h-screen flex flex-col relative">
+      <AnimatedBackground />
 
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto">
-          {discovery && (
-            <div ref={discoveryRef} className="px-6 pt-4">
-              <DiscoveryCard discovery={discovery} onDismiss={dismiss} />
+      <div className="relative z-10 flex flex-col min-h-screen">
+        <Header hasDiscovery={discovery !== null} onDiscoveryClick={scrollToDiscovery} />
+
+        <div className="flex flex-1 overflow-hidden">
+          <Sidebar />
+          <main className="flex-1 overflow-y-auto">
+            {discovery && (
+              <div ref={discoveryRef} className="px-6 pt-4">
+                <DiscoveryCard discovery={discovery} onDismiss={dismiss} />
+              </div>
+            )}
+            <div className="px-6 py-5">
+              {children}
             </div>
-          )}
-          <div className="px-6 py-4">
-            {children}
-          </div>
-        </main>
+          </main>
+        </div>
       </div>
     </div>
   );

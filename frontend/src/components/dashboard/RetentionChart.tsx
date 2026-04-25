@@ -26,7 +26,7 @@ const data = buildCurveData();
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value?: number }>; label?: string }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="glass-card px-3 py-2 text-xs border-cosmos-600">
+    <div className="px-3 py-2 text-xs rounded-xl" style={{ background:'rgba(5,8,16,0.95)', border:'1px solid rgba(124,58,237,0.3)', boxShadow:'0 20px 60px rgba(0,0,0,0.6)' }}>
       <p className="text-slate-400">{label}</p>
       <p className="text-nebula-400 font-mono font-semibold">{payload[0]?.value ?? 0}% retention</p>
     </div>
@@ -35,7 +35,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 
 export function RetentionChart() {
   return (
-    <div className="glass-card p-5 space-y-3">
+    <div className="gcard p-5 space-y-3">
       <div className="flex items-center gap-2">
         <TrendingDown size={14} className="text-pulsar-400" />
         <h2 className="text-sm font-semibold text-slate-200">Forgetting Curve</h2>

@@ -1,4 +1,4 @@
-import { X, Sparkles, Clock, TrendingDown, ArrowRight } from 'lucide-react';
+import { X, Sparkles, Clock, FileText, ArrowRight, Zap } from 'lucide-react';
 import { retentionToColor, retentionToLabel } from '@/styles/theme';
 import { formatRetentionPct, formatRelativeTime } from '@/lib/utils';
 import type { DiscoveryResponse } from '@/lib/types';
@@ -17,81 +17,80 @@ export function DiscoveryCard({ discovery, onDismiss }: DiscoveryCardProps) {
 
   return (
     <div
-      className="animate-slide-in-right relative rounded-xl border-2 p-4 mb-2 overflow-hidden"
+      className="animate-slide-in-right relative rounded-2xl overflow-hidden mb-2"
       style={{
-        borderColor: '#f97316',
-        background: 'linear-gradient(135deg, rgba(249,115,22,0.08) 0%, rgba(15,23,42,0.95) 60%)',
+        background: 'linear-gradient(135deg, rgba(249,115,22,0.1) 0%, rgba(5,8,16,0.95) 60%)',
+        border: '1px solid rgba(249,115,22,0.35)',
+        boxShadow: '0 0 40px rgba(249,115,22,0.12), 0 25px 60px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)',
       }}
     >
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div
-          className="absolute -top-8 -right-8 w-32 h-32 rounded-full opacity-10 blur-2xl"
-          style={{ background: '#f97316' }}
-        />
-      </div>
+      {/* Glow blob */}
+      <div
+        className="absolute -top-12 -right-12 w-40 h-40 rounded-full pointer-events-none"
+        style={{ background: 'rgba(249,115,22,0.15)', filter: 'blur(40px)' }}
+      />
 
-      <div className="relative flex items-start gap-3">
-        <div className="shrink-0 mt-0.5 w-8 h-8 rounded-full bg-flare-500/20 border border-flare-500/40 flex items-center justify-center animate-float">
-          <Sparkles size={14} className="text-flare-400" />
+      <div className="relative flex items-start gap-4 p-5">
+        {/* Icon */}
+        <div
+          className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center animate-float"
+          style={{
+            background: 'linear-gradient(135deg, rgba(249,115,22,0.3), rgba(249,115,22,0.1))',
+            border: '1px solid rgba(249,115,22,0.4)',
+            boxShadow: '0 0 20px rgba(249,115,22,0.3)',
+          }}
+        >
+          <Sparkles size={16} className="text-flare-300" />
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-semibold text-flare-400 uppercase tracking-wide">
+          {/* Header */}
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-bold text-flare-400 uppercase tracking-wider">
               I just found something!
             </span>
-            <span
-              className="text-[10px] font-mono px-1.5 py-0.5 rounded-full border"
-              style={{
-                color,
-                borderColor: `${color}40`,
-                background: `${color}15`,
-              }}
+            <div
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border"
+              style={{ color, borderColor: `${color}40`, background: `${color}15`, boxShadow: `0 0 8px ${color}30` }}
             >
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
               {label} — {formatRetentionPct(retention)}
-            </span>
+            </div>
           </div>
 
+          {/* Content */}
           <p className="text-sm text-slate-200 font-medium leading-relaxed line-clamp-2 mb-2">
             {chunk.content}
           </p>
 
-          <p className="text-xs text-slate-400 mb-3">{reason}</p>
+          <p className="text-xs text-slate-500 mb-3">{reason}</p>
 
+          {/* Meta + CTA */}
           <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-1.5 text-xs text-slate-500">
-              <Clock size={11} />
-              <span>{formatRelativeTime(chunk.last_accessed)}</span>
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
+              <Clock size={10} /> {formatRelativeTime(chunk.last_accessed)}
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500">
-              <TrendingDown size={11} />
-              <span>{chunk.source_name}</span>
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
+              <FileText size={10} /> {chunk.source_name}
             </div>
-
-            <div className="ml-auto flex items-center gap-2">
-              <Link
-                to={`/search?q=${encodeURIComponent(chunk.content.slice(0, 50))}`}
-                className="flex items-center gap-1 text-xs text-nebula-400 hover:text-nebula-300 transition-colors"
-              >
-                Review now
-                <ArrowRight size={11} />
-              </Link>
-            </div>
+            <Link
+              to={`/search?q=${encodeURIComponent(chunk.content.slice(0, 50))}`}
+              className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-flare-400 hover:text-flare-300 transition-colors"
+            >
+              <Zap size={11} /> Review now <ArrowRight size={11} />
+            </Link>
           </div>
 
-          <div className="mt-3 flex items-center gap-2">
-            <span className="text-[10px] text-slate-600">Retention</span>
-            <div className="flex-1 h-1 bg-cosmos-700 rounded-full overflow-hidden">
+          {/* Retention bar */}
+          <div className="flex items-center gap-2 mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            <span className="text-[10px] text-slate-700">Retention</span>
+            <div className="flex-1 retention-bar-track">
               <div
-                className="h-full rounded-full transition-all duration-700"
-                style={{
-                  width: `${retention * 100}%`,
-                  background: color,
-                  boxShadow: `0 0 8px ${color}80`,
-                }}
+                className="retention-bar-fill"
+                style={{ width: `${retention * 100}%`, background: color, color }}
               />
             </div>
-            <span className="text-[10px] font-mono text-slate-400">
+            <span className="text-[10px] font-mono font-bold tabular-nums" style={{ color }}>
               {formatRetentionPct(retention)}
             </span>
           </div>
@@ -99,9 +98,9 @@ export function DiscoveryCard({ discovery, onDismiss }: DiscoveryCardProps) {
 
         <button
           onClick={onDismiss}
-          className="shrink-0 p-1 rounded text-slate-600 hover:text-slate-300 hover:bg-cosmos-700/50 transition-all duration-200"
+          className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-slate-600 hover:text-slate-300 transition-all hover:bg-white/5"
         >
-          <X size={14} />
+          <X size={13} />
         </button>
       </div>
     </div>
