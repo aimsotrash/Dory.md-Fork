@@ -18,16 +18,19 @@ OAuth mode endpoints (stubbed — implement when NOTION_AUTH_MODE=oauth):
 """
 
 import os
+from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from notion_client import Client as NotionClient
+from pydantic import BaseModel
 
 from core import chunker, complexity
 from core.embeddings import embed_texts
 from database.db import DEFAULT_USER_ID, delete_oauth_token, get_oauth_token, insert_chunk, store_oauth_token
 from models.schemas import NotionImportRequest, NotionImportResponse, NotionPage
 from parsers.notion_blocks import blocks_to_markdown
+from parsers.markdown_to_notion import markdown_to_notion_blocks
 from services.category_service import classify_and_store
 from services.chroma_service import add_chunks
 
@@ -178,3 +181,43 @@ async def notion_auth_callback(request: Request, response: Response):
 def revoke_notion():
     delete_oauth_token(DEFAULT_USER_ID)
     return {"message": "Notion integration revoked."}
+
+
+# ── Write a note TO Notion ────────────────────────────────────────────────────
+
+class NotionCreateRequest(BaseModel):
+    title: str
+    content: str
+    parent_id: str
+    token: Optional[str] = None
+
+
+@router.post("/api/notion/create")
+async def create_notion_page(body: NotionCreateRequest, background_tasks: BackgroundTasks):
+    """Create a new Notion page from markdown content."""
+    token = body.token or get_oauth_token(DEFAULT_USER_ID)
+    if not token:
+        raise HTTPException(status_code=401, detail="No Notion token. Pass 'token' in request or connect via OAuth.")
+
+    notion = NotionClient(auth=token)
+    blocks = markdown_to_notion_blocks(body.content)
+
+    # Notion limits block creation to 100 at a time
+    try:
+        page = notion.pages.create(
+            parent={"page_id": body.parent_id.replace("-", "")},
+            properties={"title": [{"type": "text", "text": {"content": body.title}}]},
+            children=blocks[:100],
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Notion API error: {e}")
+
+    # Also ingest the content into Dory's memory
+    n = _ingest_markdown(body.content, f"Notion: {body.title}", background_tasks)
+
+    return {
+        "page_id": page["id"],
+        "url": page.get("url", ""),
+        "title": body.title,
+        "chunks_indexed": n,
+    }

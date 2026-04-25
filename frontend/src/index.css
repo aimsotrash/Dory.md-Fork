@@ -1,116 +1,147 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  * {
-    box-sizing: border-box;
-  }
+  * { box-sizing: border-box; }
 
-  html {
-    scroll-behavior: smooth;
-  }
+  html { scroll-behavior: smooth; }
 
   body {
-    @apply bg-cosmos-950 text-slate-100 font-sans antialiased;
+    @apply bg-ink-900 text-ink-50 font-body antialiased;
     background-image:
-      radial-gradient(ellipse at 20% 50%, rgba(124, 58, 237, 0.08) 0%, transparent 50%),
-      radial-gradient(ellipse at 80% 20%, rgba(8, 145, 178, 0.06) 0%, transparent 50%),
-      radial-gradient(ellipse at 60% 80%, rgba(249, 115, 22, 0.04) 0%, transparent 50%);
+      linear-gradient(rgba(245,166,35,0.012) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(245,166,35,0.012) 1px, transparent 1px);
+    background-size: 40px 40px;
     min-height: 100vh;
   }
 
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: #080808; }
+  ::-webkit-scrollbar-thumb { background: #363636; }
+  ::-webkit-scrollbar-thumb:hover { background: #525252; }
 
-  ::-webkit-scrollbar-track {
-    @apply bg-cosmos-900;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    @apply bg-cosmos-700 rounded-full;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-cosmos-600;
-  }
+  h1, h2, h3, h4 { @apply font-display; }
 }
 
 @layer components {
-  .glass-card {
-    @apply bg-cosmos-900/80 border border-cosmos-700/50 rounded-xl backdrop-blur-sm;
+  /* Metro tile card */
+  .tile {
+    @apply bg-ink-800 border border-ink-600 relative overflow-hidden transition-all duration-200;
+  }
+  .tile:hover { @apply border-ink-500 bg-ink-750; }
+
+  /* Accent border variants */
+  .tile-amber  { border-left: 3px solid #F5A623; }
+  .tile-teal   { border-left: 3px solid #00D4AA; }
+  .tile-red    { border-left: 3px solid #F53B30; }
+  .tile-blue   { border-left: 3px solid #0078D4; }
+  .tile-purple { border-left: 3px solid #7C3AED; }
+  .tile-green  { border-left: 3px solid #16A34A; }
+
+  /* Active tile glow */
+  .tile-amber:hover  { @apply shadow-glow-amber; }
+  .tile-teal:hover   { @apply shadow-glow-teal; }
+  .tile-red:hover    { @apply shadow-glow-red; }
+
+  /* Label style — metro uppercase */
+  .label {
+    @apply text-xs font-mono font-semibold uppercase tracking-widest text-ink-300;
   }
 
-  .glass-card-hover {
-    @apply glass-card transition-all duration-200 hover:border-nebula-500/40 hover:bg-cosmos-800/60;
+  /* Stat number — terminal amber */
+  .stat-num {
+    @apply font-mono font-semibold text-terminal-amber tabular-nums;
   }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center gap-2 px-4 py-2 text-sm font-medium
+           border border-ink-500 bg-ink-750 text-ink-100
+           transition-all duration-150 active:scale-95 cursor-pointer;
+  }
+  .btn:hover { @apply border-metro-amber text-metro-amber; }
 
   .btn-primary {
-    @apply px-4 py-2 bg-nebula-500 hover:bg-nebula-600 text-white rounded-lg font-medium text-sm transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold
+           bg-metro-amber text-ink-900
+           transition-all duration-150 active:scale-95 cursor-pointer;
   }
-
-  .btn-secondary {
-    @apply px-4 py-2 bg-cosmos-800 hover:bg-cosmos-700 text-slate-300 hover:text-white border border-cosmos-700 rounded-lg font-medium text-sm transition-all duration-200 active:scale-95;
-  }
+  .btn-primary:hover { @apply bg-terminal-amber; }
 
   .btn-ghost {
-    @apply px-3 py-1.5 text-slate-400 hover:text-slate-200 hover:bg-cosmos-800 rounded-lg text-sm transition-all duration-200;
+    @apply inline-flex items-center gap-2 px-3 py-1.5 text-sm
+           text-ink-300 hover:text-ink-100 hover:bg-ink-700
+           transition-all duration-150 cursor-pointer;
   }
 
-  .input-field {
-    @apply w-full bg-cosmos-800 border border-cosmos-700 rounded-lg px-4 py-2.5 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-nebula-500/70 focus:ring-1 focus:ring-nebula-500/30 transition-all duration-200;
+  /* Input */
+  .input {
+    @apply w-full bg-ink-800 border border-ink-600 px-3 py-2
+           text-ink-100 text-sm font-mono placeholder-ink-400
+           focus:outline-none focus:border-metro-amber
+           transition-colors duration-150;
   }
 
-  .tag {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
-  }
-
-  .retention-bar {
-    @apply h-1.5 rounded-full transition-all duration-500;
-  }
-
+  /* Nav item */
   .nav-item {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-cosmos-800 transition-all duration-200 cursor-pointer text-sm font-medium;
+    @apply flex items-center gap-3 px-3 py-2.5 text-sm font-medium
+           text-ink-300 hover:text-ink-50 hover:bg-ink-700
+           transition-all duration-150 cursor-pointer border-l-2 border-transparent;
+  }
+  .nav-item-active {
+    @apply flex items-center gap-3 px-3 py-2.5 text-sm font-medium
+           text-metro-amber bg-ink-750
+           border-l-2 border-metro-amber cursor-pointer;
   }
 
-  .nav-item-active {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-white bg-nebula-500/20 border border-nebula-500/30 transition-all duration-200 cursor-pointer text-sm font-medium;
+  /* Retention badge */
+  .badge-strong   { @apply text-xs font-mono px-1.5 py-0.5 bg-metro-green/10 text-metro-green border border-metro-green/20; }
+  .badge-fading   { @apply text-xs font-mono px-1.5 py-0.5 bg-metro-amber/10 text-metro-amber border border-metro-amber/20; }
+  .badge-weak     { @apply text-xs font-mono px-1.5 py-0.5 bg-metro-red/10 text-metro-red border border-metro-red/20; }
+  .badge-critical { @apply text-xs font-mono px-1.5 py-0.5 bg-metro-red/20 text-metro-red border border-metro-red/30; }
+
+  /* Scanline overlay */
+  .scanlines::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
   }
+
+  /* Markdown preview */
+  .md-preview h1 { @apply text-2xl font-display font-bold text-ink-50 mt-6 mb-3; }
+  .md-preview h2 { @apply text-xl font-display font-semibold text-ink-100 mt-5 mb-2; }
+  .md-preview h3 { @apply text-lg font-display font-medium text-ink-100 mt-4 mb-2; }
+  .md-preview p  { @apply text-ink-200 leading-relaxed mb-3; }
+  .md-preview ul { @apply list-disc pl-5 text-ink-200 mb-3 space-y-1; }
+  .md-preview ol { @apply list-decimal pl-5 text-ink-200 mb-3 space-y-1; }
+  .md-preview code { @apply font-mono text-terminal-amber bg-ink-750 px-1; }
+  .md-preview pre { @apply bg-ink-750 border border-ink-600 p-3 font-mono text-sm text-metro-green overflow-x-auto mb-3; }
+  .md-preview blockquote { @apply border-l-3 border-metro-amber pl-3 text-ink-300 italic mb-3; }
+  .md-preview hr { @apply border-ink-600 my-4; }
+  .md-preview a { @apply text-metro-teal underline; }
+  .md-preview strong { @apply text-ink-50 font-semibold; }
 }
 
 @layer utilities {
-  .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-nebula-400 to-pulsar-400;
+  .text-amber { @apply text-metro-amber; }
+  .border-l-3 { border-left-width: 3px; }
+
+  /* Retro glow text */
+  .glow-text-amber {
+    text-shadow: 0 0 12px rgba(245,166,35,0.6), 0 0 24px rgba(245,166,35,0.2);
   }
-
-  .glow-nebula {
-    box-shadow: 0 0 20px rgba(124, 58, 237, 0.3);
+  .glow-text-teal {
+    text-shadow: 0 0 12px rgba(0,212,170,0.6), 0 0 24px rgba(0,212,170,0.2);
   }
-
-  .glow-pulsar {
-    box-shadow: 0 0 20px rgba(8, 145, 178, 0.3);
-  }
-
-  .glow-flare {
-    box-shadow: 0 0 20px rgba(249, 115, 22, 0.3);
-  }
-
-  .star-field {
-    background-image:
-      radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.15) 0%, transparent 100%),
-      radial-gradient(1px 1px at 30% 60%, rgba(255,255,255,0.1) 0%, transparent 100%),
-      radial-gradient(1px 1px at 50% 10%, rgba(255,255,255,0.12) 0%, transparent 100%),
-      radial-gradient(1px 1px at 70% 40%, rgba(255,255,255,0.08) 0%, transparent 100%),
-      radial-gradient(1px 1px at 90% 75%, rgba(255,255,255,0.1) 0%, transparent 100%);
-  }
-}
-
-mark {
-  @apply bg-nebula-500/30 text-nebula-300 rounded px-0.5;
-}
-
-.recharts-tooltip-wrapper .recharts-default-tooltip {
-  @apply !bg-cosmos-800 !border-cosmos-700 !rounded-lg !text-slate-200;
 }
