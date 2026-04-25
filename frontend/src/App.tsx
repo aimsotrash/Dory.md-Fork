@@ -7,6 +7,7 @@ import { LibraryPage } from '@/pages/LibraryPage'
 import { NoteEditorPage } from '@/pages/NoteEditorPage'
 import { PomodoroPage } from '@/pages/PomodoroPage'
 import { CalendarPage } from '@/pages/CalendarPage'
+import { NotionPage } from '@/pages/NotionPage'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/pomodoro" element={<PomodoroPage />} />
           <Route path="/quiz"     element={<QuizPage />} />
+          <Route path="/notion"   element={<NotionPage />} />
           <Route
             path="*"
             element={

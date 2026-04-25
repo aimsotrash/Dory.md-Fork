@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { marked } from 'marked'
-import { ingestText } from '@/lib/api'
+import { ingestText, notionStatus, listNotionPages, createNotionPage } from '@/lib/api'
+import type { NotionPage } from '@/lib/types'
 
 const TOOLBAR = [
   { label: 'H1', action: (t: string) => `# ${t}` },
@@ -20,11 +22,27 @@ export function NoteEditorPage() {
   const [content, setContent] = useState('')
   const [preview, setPreview] = useState(false)
   const [saveMode, setSaveMode] = useState<SaveMode>('dory')
-  const [notionToken, setNotionToken] = useState('')
-  const [notionParentId, setNotionParentId] = useState('')
-  const [_showNotionCfg, setShowNotionCfg] = useState(false)
+  const [notionConnected, setNotionConnected] = useState(false)
+  const [notionPages, setNotionPages] = useState<NotionPage[]>([])
+  const [selectedParentId, setSelectedParentId] = useState('')
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (saveMode === 'notion' && !notionConnected) {
+      notionStatus()
+        .then(s => {
+          setNotionConnected(s.connected)
+          if (s.connected) {
+            listNotionPages().then(pages => {
+              setNotionPages(pages)
+              if (pages.length) setSelectedParentId(pages[0].id)
+            }).catch(() => {})
+          }
+        })
+        .catch(() => {})
+    }
+  }, [saveMode])
 
   const renderedHtml = marked.parse(content || '*Start writing...*') as string
 
@@ -50,15 +68,10 @@ export function NoteEditorPage() {
   }
 
   async function saveToNotion() {
-    if (!notionToken || !notionParentId) { setShowNotionCfg(true); return }
+    if (!selectedParentId) { setStatus('Select a parent page first'); return }
     setSaving(true)
     try {
-      const res = await fetch('/api/notion/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: notionToken, parent_id: notionParentId, title: title || 'Untitled', content }),
-      })
-      if (!res.ok) throw new Error(await res.text())
+      await createNotionPage({ title: title || 'Untitled', content, parent_id: selectedParentId })
       setStatus('Saved to Notion ✓')
       setTimeout(() => setStatus(null), 2500)
     } catch (e: any) {
@@ -129,29 +142,36 @@ export function NoteEditorPage() {
 
       {/* Notion config panel */}
       {saveMode === 'notion' && (
-        <div className="tile tile-teal p-4 mb-4 flex gap-4 items-end">
-          <div className="flex-1">
-            <label className="label mb-1 block">Notion Token</label>
-            <input
-              className="input"
-              type="password"
-              placeholder="secret_..."
-              value={notionToken}
-              onChange={e => setNotionToken(e.target.value)}
-            />
-          </div>
-          <div className="flex-1">
-            <label className="label mb-1 block">Parent Page ID</label>
-            <input
-              className="input"
-              placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-              value={notionParentId}
-              onChange={e => setNotionParentId(e.target.value)}
-            />
-          </div>
-          <p className="text-[10px] font-mono text-ink-400 w-40">
-            Get your token from Notion → Settings → Integrations
-          </p>
+        <div className="tile tile-teal p-4 mb-4">
+          {notionConnected ? (
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <label className="label mb-1 block">Save under page</label>
+                {notionPages.length > 0 ? (
+                  <select
+                    className="input w-full"
+                    value={selectedParentId}
+                    onChange={e => setSelectedParentId(e.target.value)}
+                  >
+                    {notionPages.map(p => (
+                      <option key={p.id} value={p.id}>{p.title}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-xs font-mono text-ink-400">No pages found — share pages with your integration first.</p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-4">
+              <p className="text-sm font-mono text-ink-300 flex-1">
+                Not connected to Notion.
+              </p>
+              <Link to="/notion" className="btn-primary text-xs">
+                Connect Notion →
+              </Link>
+            </div>
+          )}
         </div>
       )}
 

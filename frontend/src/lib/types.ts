@@ -94,3 +94,30 @@ export interface IngestResponse {
   complexity_k: number;
   message: string;
 }
+
+export interface FileIngestResponse {
+  chunks_created: number;
+  source: string;
+}
+
+export interface NotionStatus {
+  connected: boolean;
+  oauth_available: boolean;
+  workspace?: string;
+  avatar?: string;
+}
+
+export interface NotionPage {
+  id: string;
+  title: string;
+}
+
+export interface NotionConnectResponse {
+  connected: boolean;
+  workspace: string;
+}
+
+export interface NotionImportResponse {
+  pages_imported: number;
+  chunks_created: number;
+}

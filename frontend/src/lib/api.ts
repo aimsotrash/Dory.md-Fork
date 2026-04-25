@@ -7,6 +7,11 @@ import type {
   QuizAnswer,
   QuizResults,
   IngestResponse,
+  FileIngestResponse,
+  NotionStatus,
+  NotionPage,
+  NotionConnectResponse,
+  NotionImportResponse,
 } from './types';
 
 import mockHealth from '@/data/mock_health.json';
@@ -133,7 +138,7 @@ export async function ingestText(
       message: 'Chunk ingested successfully (mock)',
     };
   }
-  return apiFetch<IngestResponse>('/api/ingest', {
+  return apiFetch<IngestResponse>('/api/ingest/text', {
     method: 'POST',
     body: JSON.stringify({ content, source_type: sourceType, source_name: sourceName }),
   });
@@ -145,4 +150,48 @@ export async function getSearchResults(query: string): Promise<SearchResponse> {
     return mockSearchResults as SearchResponse;
   }
   return search(query);
+}
+
+export async function ingestFile(file: File): Promise<FileIngestResponse> {
+  const form = new FormData();
+  form.append('files', file);
+  const res = await fetch(`${config.apiBaseUrl}/api/ingest`, { method: 'POST', body: form });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`API ${res.status}: ${text}`);
+  }
+  return res.json() as Promise<FileIngestResponse>;
+}
+
+export async function notionStatus(): Promise<NotionStatus> {
+  return apiFetch<NotionStatus>('/api/notion/status');
+}
+
+export async function notionConnect(token: string): Promise<NotionConnectResponse> {
+  return apiFetch<NotionConnectResponse>('/api/notion/connect', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+}
+
+export async function listNotionPages(): Promise<NotionPage[]> {
+  return apiFetch<NotionPage[]>('/api/notion/pages');
+}
+
+export async function importNotionPages(pageIds: string[]): Promise<NotionImportResponse> {
+  return apiFetch<NotionImportResponse>('/api/notion/import', {
+    method: 'POST',
+    body: JSON.stringify({ page_ids: pageIds }),
+  });
+}
+
+export async function createNotionPage(params: {
+  title: string;
+  content: string;
+  parent_id: string;
+}): Promise<{ page_id: string; url: string; chunks_indexed: number }> {
+  return apiFetch('/api/notion/create', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
 }

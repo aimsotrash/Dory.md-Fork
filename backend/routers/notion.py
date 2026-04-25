@@ -1,53 +1,66 @@
 """
 Notion integration router.
 
-Supports two modes via NOTION_AUTH_MODE env var:
-  internal  — user provides their own integration token + page IDs directly.
-              No OAuth, no approval needed. Built first.
-  oauth     — full OAuth consent flow (add during Day 2 polish).
+Auth modes (auto-detected from env vars):
+  OAuth  — NOTION_CLIENT_ID + NOTION_CLIENT_SECRET set → full OAuth2 flow
+            GET  /auth/notion           → redirect to Notion consent
+            GET  /auth/notion/callback  → exchange code, store token
+  Internal — fallback; user pastes their own token in the frontend
+             Token stored in oauth_tokens table the same way
 
-Internal mode endpoints:
-  POST /api/notion/import   { token, page_ids }
-
-OAuth mode endpoints (stubbed — implement when NOTION_AUTH_MODE=oauth):
-  GET  /auth/notion           → redirect to consent
-  GET  /auth/notion/callback  → token exchange
-  GET  /api/notion/pages      → list pages
-  POST /api/notion/import     → import selected pages (token from session)
-  DELETE /auth/notion         → revoke
+All API endpoints work with whichever token is stored:
+  GET  /api/notion/status        → connection info + oauth availability
+  GET  /api/notion/pages         → list accessible pages
+  POST /api/notion/import        → import selected pages into Dory
+  POST /api/notion/create        → write a new page to Notion
+  DELETE /auth/notion            → revoke / disconnect
 """
 
+import base64
 import os
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response
+import httpx
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from notion_client import Client as NotionClient
 from pydantic import BaseModel
 
 from core import chunker, complexity
 from core.embeddings import embed_texts
-from database.db import DEFAULT_USER_ID, delete_oauth_token, get_oauth_token, insert_chunk, store_oauth_token
+from database.db import (
+    DEFAULT_USER_ID,
+    delete_oauth_token,
+    get_oauth_token,
+    insert_chunk,
+    store_oauth_token,
+)
 from models.schemas import NotionImportRequest, NotionImportResponse, NotionPage
-from parsers.notion_blocks import blocks_to_markdown
 from parsers.markdown_to_notion import markdown_to_notion_blocks
+from parsers.notion_blocks import blocks_to_markdown
 from services.category_service import classify_and_store
 from services.chroma_service import add_chunks
 
 router = APIRouter()
 
-AUTH_MODE = os.getenv("NOTION_AUTH_MODE", "internal").lower()
+# OAuth is available when both client credentials are configured
+_CLIENT_ID     = os.getenv("NOTION_CLIENT_ID", "")
+_CLIENT_SECRET = os.getenv("NOTION_CLIENT_SECRET", "")
+_REDIRECT_URI  = os.getenv("NOTION_REDIRECT_URI", "http://localhost:8000/auth/notion/callback")
+_FRONTEND_URL  = os.getenv("FRONTEND_URL", "http://localhost:5173")
+OAUTH_AVAILABLE = bool(_CLIENT_ID and _CLIENT_SECRET)
 
+
+# ── Shared helpers ─────────────────────────────────────────────────────────────
 
 def _ingest_markdown(text: str, source_name: str, background_tasks: BackgroundTasks) -> int:
-    """Shared ingestion pipeline for Notion markdown content."""
     chunks = chunker.chunk_text(text)
     if not chunks:
         return 0
     scores = [complexity.score(c) for c in chunks]
     embeddings = embed_texts(chunks)
     chunk_ids = []
-    for c, s, e in zip(chunks, scores, embeddings):
+    for c, s in zip(chunks, scores):
         cid = insert_chunk(content=c, source_file=source_name, complexity_score=s, user_id=DEFAULT_USER_ID)
         chunk_ids.append(cid)
     metadatas = [{"user_id": DEFAULT_USER_ID, "chunk_id": cid, "source_file": source_name} for cid in chunk_ids]
@@ -58,10 +71,9 @@ def _ingest_markdown(text: str, source_name: str, background_tasks: BackgroundTa
 
 
 def _fetch_page_blocks(notion: NotionClient, page_id: str) -> list[dict]:
-    results = []
-    cursor = None
+    results, cursor = [], None
     while True:
-        kwargs = {"block_id": page_id}
+        kwargs: dict = {"block_id": page_id}
         if cursor:
             kwargs["start_cursor"] = cursor
         resp = notion.blocks.children.list(**kwargs)
@@ -81,20 +93,146 @@ def _page_title(page: dict) -> str:
     return page["id"]
 
 
-# ── Internal mode ──────────────────────────────────────────────────────────────
+def _get_token() -> str | None:
+    return get_oauth_token(DEFAULT_USER_ID)
+
+
+# ── Status ─────────────────────────────────────────────────────────────────────
+
+@router.get("/api/notion/status")
+def notion_status():
+    """Return connection state and whether OAuth is configured."""
+    token = _get_token()
+    if not token:
+        return {"connected": False, "oauth_available": OAUTH_AVAILABLE}
+    try:
+        notion = NotionClient(auth=token)
+        user = notion.users.me()
+        workspace = user.get("name") or "Notion Workspace"
+        avatar = user.get("avatar_url")
+        return {
+            "connected": True,
+            "oauth_available": OAUTH_AVAILABLE,
+            "workspace": workspace,
+            "avatar": avatar,
+        }
+    except Exception:
+        # Token is stale / revoked
+        delete_oauth_token(DEFAULT_USER_ID)
+        return {"connected": False, "oauth_available": OAUTH_AVAILABLE}
+
+
+# ── OAuth flow ─────────────────────────────────────────────────────────────────
+
+@router.get("/auth/notion")
+def notion_auth_start():
+    if not OAUTH_AVAILABLE:
+        raise HTTPException(
+            status_code=501,
+            detail=(
+                "Notion OAuth is not configured. "
+                "Set NOTION_CLIENT_ID and NOTION_CLIENT_SECRET in .env "
+                "and restart the server."
+            ),
+        )
+    url = (
+        "https://api.notion.com/v1/oauth/authorize"
+        f"?client_id={_CLIENT_ID}"
+        "&response_type=code"
+        "&owner=user"
+        f"&redirect_uri={_REDIRECT_URI}"
+    )
+    return RedirectResponse(url)
+
+
+@router.get("/auth/notion/callback")
+async def notion_auth_callback(request: Request):
+    code = request.query_params.get("code")
+    error = request.query_params.get("error")
+
+    if error or not code:
+        return RedirectResponse(f"{_FRONTEND_URL}/notion?error={error or 'missing_code'}")
+
+    credentials = base64.b64encode(f"{_CLIENT_ID}:{_CLIENT_SECRET}".encode()).decode()
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            "https://api.notion.com/v1/oauth/token",
+            headers={
+                "Authorization": f"Basic {credentials}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": _REDIRECT_URI,
+            },
+        )
+        data = resp.json()
+
+    if "access_token" not in data:
+        return RedirectResponse(f"{_FRONTEND_URL}/notion?error=token_exchange_failed")
+
+    store_oauth_token(
+        user_id=DEFAULT_USER_ID,
+        access_token=data["access_token"],
+        workspace_id=data.get("workspace_id", ""),
+        bot_id=data.get("bot_id", ""),
+    )
+    return RedirectResponse(f"{_FRONTEND_URL}/notion?connected=true")
+
+
+@router.delete("/auth/notion")
+def revoke_notion():
+    delete_oauth_token(DEFAULT_USER_ID)
+    return {"message": "Notion disconnected."}
+
+
+# ── Internal token connect (fallback when OAuth not configured) ────────────────
+
+class TokenConnectRequest(BaseModel):
+    token: str
+
+
+@router.post("/api/notion/connect")
+def connect_with_token(body: TokenConnectRequest):
+    """Store an internal integration token (no OAuth needed)."""
+    try:
+        notion = NotionClient(auth=body.token)
+        user = notion.users.me()
+        workspace = user.get("name") or "Notion Workspace"
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
+    store_oauth_token(
+        user_id=DEFAULT_USER_ID,
+        access_token=body.token,
+        workspace_id="",
+        bot_id="",
+    )
+    return {"connected": True, "workspace": workspace}
+
+
+# ── Pages ──────────────────────────────────────────────────────────────────────
+
+@router.get("/api/notion/pages", response_model=list[NotionPage])
+def list_notion_pages():
+    token = _get_token()
+    if not token:
+        raise HTTPException(status_code=401, detail="Not connected to Notion.")
+    notion = NotionClient(auth=token)
+    resp = notion.search(filter={"property": "object", "value": "page"}, page_size=50)
+    return [NotionPage(id=p["id"], title=_page_title(p)) for p in resp.get("results", [])]
+
+
+# ── Import pages into Dory ─────────────────────────────────────────────────────
 
 @router.post("/api/notion/import", response_model=NotionImportResponse)
 async def import_notion_pages(body: NotionImportRequest, background_tasks: BackgroundTasks):
-    token = body.token or get_oauth_token(DEFAULT_USER_ID)
+    token = body.token or _get_token()
     if not token:
-        raise HTTPException(
-            status_code=401,
-            detail="No Notion token provided. Pass 'token' in the request body or connect via OAuth.",
-        )
+        raise HTTPException(status_code=401, detail="Not connected to Notion.")
 
     notion = NotionClient(auth=token)
-    total_pages = 0
-    total_chunks = 0
+    total_pages = total_chunks = 0
 
     for page_id in body.page_ids:
         try:
@@ -103,8 +241,7 @@ async def import_notion_pages(body: NotionImportRequest, background_tasks: Backg
             blocks = _fetch_page_blocks(notion, page_id)
             markdown = blocks_to_markdown(blocks)
             if markdown.strip():
-                n = _ingest_markdown(markdown, f"Notion: {title}", background_tasks)
-                total_chunks += n
+                total_chunks += _ingest_markdown(markdown, f"Notion: {title}", background_tasks)
             total_pages += 1
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to fetch page {page_id}: {e}")
@@ -112,97 +249,24 @@ async def import_notion_pages(body: NotionImportRequest, background_tasks: Backg
     return NotionImportResponse(pages_imported=total_pages, chunks_created=total_chunks)
 
 
-@router.get("/api/notion/pages", response_model=list[NotionPage])
-def list_notion_pages(token: str | None = None):
-    t = token or get_oauth_token(DEFAULT_USER_ID)
-    if not t:
-        raise HTTPException(status_code=401, detail="No Notion token.")
-    notion = NotionClient(auth=t)
-    resp = notion.search(filter={"property": "object", "value": "page"}, page_size=50)
-    pages = []
-    for p in resp.get("results", []):
-        pages.append(NotionPage(id=p["id"], title=_page_title(p)))
-    return pages
-
-
-# ── OAuth mode stubs (implement when NOTION_AUTH_MODE=oauth) ──────────────────
-
-@router.get("/auth/notion")
-def notion_auth_start():
-    if AUTH_MODE != "oauth":
-        raise HTTPException(status_code=501, detail="Set NOTION_AUTH_MODE=oauth to enable OAuth flow.")
-    client_id = os.getenv("NOTION_CLIENT_ID", "")
-    redirect_uri = os.getenv("NOTION_REDIRECT_URI", "")
-    url = (
-        f"https://api.notion.com/v1/oauth/authorize"
-        f"?client_id={client_id}&response_type=code&owner=user&redirect_uri={redirect_uri}"
-    )
-    return RedirectResponse(url)
-
-
-@router.get("/auth/notion/callback")
-async def notion_auth_callback(request: Request, response: Response):
-    if AUTH_MODE != "oauth":
-        raise HTTPException(status_code=501, detail="Set NOTION_AUTH_MODE=oauth to enable OAuth flow.")
-    code = request.query_params.get("code")
-    if not code:
-        raise HTTPException(status_code=400, detail="Missing OAuth code.")
-
-    import base64
-    import httpx
-
-    client_id = os.getenv("NOTION_CLIENT_ID", "")
-    client_secret = os.getenv("NOTION_CLIENT_SECRET", "")
-    redirect_uri = os.getenv("NOTION_REDIRECT_URI", "")
-    credentials = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
-
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            "https://api.notion.com/v1/oauth/token",
-            headers={"Authorization": f"Basic {credentials}", "Content-Type": "application/json"},
-            json={"grant_type": "authorization_code", "code": code, "redirect_uri": redirect_uri},
-        )
-        data = resp.json()
-
-    if "access_token" not in data:
-        raise HTTPException(status_code=400, detail=f"OAuth token exchange failed: {data}")
-
-    store_oauth_token(
-        user_id=DEFAULT_USER_ID,
-        access_token=data["access_token"],
-        workspace_id=data.get("workspace_id", ""),
-        bot_id=data.get("bot_id", ""),
-    )
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
-    return RedirectResponse(f"{frontend_url}?notion_connected=true")
-
-
-@router.delete("/auth/notion")
-def revoke_notion():
-    delete_oauth_token(DEFAULT_USER_ID)
-    return {"message": "Notion integration revoked."}
-
-
-# ── Write a note TO Notion ────────────────────────────────────────────────────
+# ── Create / write a page to Notion ───────────────────────────────────────────
 
 class NotionCreateRequest(BaseModel):
     title: str
     content: str
-    parent_id: str
+    parent_id: str          # Notion page or database ID to nest under
     token: Optional[str] = None
 
 
 @router.post("/api/notion/create")
 async def create_notion_page(body: NotionCreateRequest, background_tasks: BackgroundTasks):
-    """Create a new Notion page from markdown content."""
-    token = body.token or get_oauth_token(DEFAULT_USER_ID)
+    token = body.token or _get_token()
     if not token:
-        raise HTTPException(status_code=401, detail="No Notion token. Pass 'token' in request or connect via OAuth.")
+        raise HTTPException(status_code=401, detail="Not connected to Notion.")
 
     notion = NotionClient(auth=token)
     blocks = markdown_to_notion_blocks(body.content)
 
-    # Notion limits block creation to 100 at a time
     try:
         page = notion.pages.create(
             parent={"page_id": body.parent_id.replace("-", "")},
@@ -212,9 +276,7 @@ async def create_notion_page(body: NotionCreateRequest, background_tasks: Backgr
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Notion API error: {e}")
 
-    # Also ingest the content into Dory's memory
     n = _ingest_markdown(body.content, f"Notion: {body.title}", background_tasks)
-
     return {
         "page_id": page["id"],
         "url": page.get("url", ""),

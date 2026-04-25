@@ -9,6 +9,7 @@ const NAV = [
   { to: '/calendar', icon: '▩', label: 'CALENDAR'  },
   { to: '/pomodoro', icon: '◉', label: 'POMODORO'  },
   { to: '/quiz',     icon: '?', label: 'QUIZ'       },
+  { to: '/notion',   icon: 'N', label: 'NOTION'     },
 ]
 
 export function Sidebar() {
