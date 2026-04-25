@@ -73,6 +73,7 @@ def get_discovery():
     best_retention = 1.0
 
     for row in rows:
+        row = dict(row)
         last_accessed = _parse_dt(row["last_accessed"])
         r = calculate_retention(last_accessed, row["access_count"], row["complexity_score"])
         # Target the fading/weak band (0.1–0.65) — critical ones are already surfaced in fading feed
