@@ -1,0 +1,18 @@
+{
+  "has_discovery": true,
+  "chunk": {
+    "id": "c5",
+    "content": "Paris travel notes: The Musée d'Orsay is best visited on Thursday evenings when it stays open until 9:45pm and crowds thin. Café de Flore for breakfast, avoid tourist lunch traps near Notre-Dame.",
+    "source_type": "note",
+    "source_name": "travel_paris_2023.md",
+    "category": "personal",
+    "created_at": "2023-09-15T08:00:00Z",
+    "last_accessed": "2023-10-01T20:00:00Z",
+    "access_count": 4,
+    "stability_S": 36,
+    "complexity_k": 0.9,
+    "retention": 0.22,
+    "tags": ["travel", "paris", "tips"]
+  },
+  "reason": "You haven't reviewed this Paris travel memory in 173 days. It's fading fast — only 22% retention remaining!"
+}

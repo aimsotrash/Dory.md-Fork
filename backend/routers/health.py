@@ -56,6 +56,7 @@ def get_health(time_offset_hours: float = Query(default=0.0, ge=0.0)):
     for name, data in sorted(cat_data.items()):
         avg = float(np.mean(data["retentions"]))
         total = data["strong"] + data["fading"] + data["weak"] + data["critical"]
+        urgency = "low" if avg >= 0.7 else ("medium" if avg >= 0.4 else "high")
         category_health.append(
             CategoryHealth(
                 name=name,
@@ -65,6 +66,8 @@ def get_health(time_offset_hours: float = Query(default=0.0, ge=0.0)):
                 weak=data["weak"],
                 critical=data["critical"],
                 total=total,
+                count=total,
+                urgency=urgency,
             )
         )
 

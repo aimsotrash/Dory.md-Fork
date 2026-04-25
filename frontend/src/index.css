@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-cosmos-950 text-slate-100 font-sans antialiased;
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(124, 58, 237, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(8, 145, 178, 0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 60% 80%, rgba(249, 115, 22, 0.04) 0%, transparent 50%);
+    min-height: 100vh;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-cosmos-900;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-cosmos-700 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-cosmos-600;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-cosmos-900/80 border border-cosmos-700/50 rounded-xl backdrop-blur-sm;
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-200 hover:border-nebula-500/40 hover:bg-cosmos-800/60;
+  }
+
+  .btn-primary {
+    @apply px-4 py-2 bg-nebula-500 hover:bg-nebula-600 text-white rounded-lg font-medium text-sm transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 bg-cosmos-800 hover:bg-cosmos-700 text-slate-300 hover:text-white border border-cosmos-700 rounded-lg font-medium text-sm transition-all duration-200 active:scale-95;
+  }
+
+  .btn-ghost {
+    @apply px-3 py-1.5 text-slate-400 hover:text-slate-200 hover:bg-cosmos-800 rounded-lg text-sm transition-all duration-200;
+  }
+
+  .input-field {
+    @apply w-full bg-cosmos-800 border border-cosmos-700 rounded-lg px-4 py-2.5 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-nebula-500/70 focus:ring-1 focus:ring-nebula-500/30 transition-all duration-200;
+  }
+
+  .tag {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .retention-bar {
+    @apply h-1.5 rounded-full transition-all duration-500;
+  }
+
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-cosmos-800 transition-all duration-200 cursor-pointer text-sm font-medium;
+  }
+
+  .nav-item-active {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-white bg-nebula-500/20 border border-nebula-500/30 transition-all duration-200 cursor-pointer text-sm font-medium;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-nebula-400 to-pulsar-400;
+  }
+
+  .glow-nebula {
+    box-shadow: 0 0 20px rgba(124, 58, 237, 0.3);
+  }
+
+  .glow-pulsar {
+    box-shadow: 0 0 20px rgba(8, 145, 178, 0.3);
+  }
+
+  .glow-flare {
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.3);
+  }
+
+  .star-field {
+    background-image:
+      radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.15) 0%, transparent 100%),
+      radial-gradient(1px 1px at 30% 60%, rgba(255,255,255,0.1) 0%, transparent 100%),
+      radial-gradient(1px 1px at 50% 10%, rgba(255,255,255,0.12) 0%, transparent 100%),
+      radial-gradient(1px 1px at 70% 40%, rgba(255,255,255,0.08) 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 75%, rgba(255,255,255,0.1) 0%, transparent 100%);
+  }
+}
+
+mark {
+  @apply bg-nebula-500/30 text-nebula-300 rounded px-0.5;
+}
+
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  @apply !bg-cosmos-800 !border-cosmos-700 !rounded-lg !text-slate-200;
+}

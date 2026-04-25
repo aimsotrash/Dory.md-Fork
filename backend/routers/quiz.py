@@ -1,12 +1,13 @@
-import json
+import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from core.decay_engine import calculate_retention
 from database.db import (
     DEFAULT_USER_ID,
     create_quiz_session,
+    get_chunk,
     get_lowest_retention_chunks,
     update_chunk_access_by,
 )
@@ -15,8 +16,15 @@ from models.schemas import (
     QuizAnswerResponse,
     QuizQuestion,
     QuizStartResponse,
+    QuizSubmitRequest,
+    QuizSubmitResponse,
+    QuizResultItem,
 )
 from services.llm_service import get_llm
+
+# In-memory store: {session_id: {question_id: {correct_index, chunk_id}}}
+# Process-scoped, fine for hackathon
+_session_store: dict[str, dict[str, dict]] = {}
 
 router = APIRouter()
 
@@ -72,7 +80,15 @@ _MCQ_SYSTEM = (
 )
 
 
-def _generate_question(chunk_id: str, content: str, access_count: int, complexity_score: float, source_file: str, fallback_q: dict) -> QuizQuestion:
+def _difficulty(complexity_score: float) -> str:
+    if complexity_score < 0.33:
+        return "easy"
+    if complexity_score < 0.66:
+        return "medium"
+    return "hard"
+
+
+def _generate_question(chunk_id: str, content: str, access_count: int, complexity_score: float, source_file: str, category: str, fallback_q: dict) -> QuizQuestion:
     last_accessed = datetime.now(tz=timezone.utc)
     r = calculate_retention(last_accessed, access_count, complexity_score)
 
@@ -94,10 +110,13 @@ def _generate_question(chunk_id: str, content: str, access_count: int, complexit
     correct_index = max(0, min(correct_index, len(options) - 1))
 
     return QuizQuestion(
+        id=chunk_id,
         chunk_id=chunk_id,
         question=question,
         options=options,
         correct_index=correct_index,
+        difficulty=_difficulty(complexity_score),
+        category=category or "general",
         retention=round(r, 4),
         source_file=source_file,
     )
@@ -108,22 +127,31 @@ def start_quiz():
     rows = get_lowest_retention_chunks(DEFAULT_USER_ID, limit=5)
     session_id = create_quiz_session(DEFAULT_USER_ID, total=len(rows) or 5)
 
+    now_iso = datetime.now(tz=timezone.utc).isoformat()
+
     if not rows:
-        # No content yet — return pure fallback questions
         questions = [
             QuizQuestion(
+                id=f"fallback-{i}",
                 chunk_id=f"fallback-{i}",
                 question=q["question"],
                 options=q["options"],
                 correct_index=q["correct_index"],
+                difficulty="medium",
+                category="general",
                 retention=0.3,
                 source_file="demo",
             )
             for i, q in enumerate(_FALLBACK_QUESTIONS)
         ]
-        return QuizStartResponse(session_id=session_id, questions=questions)
+        _session_store[session_id] = {
+            f"fallback-{i}": {"correct_index": q["correct_index"], "chunk_id": f"fallback-{i}"}
+            for i, q in enumerate(_FALLBACK_QUESTIONS)
+        }
+        return QuizStartResponse(session_id=session_id, questions=questions, created_at=now_iso)
 
     questions = []
+    session_map = {}
     for i, row in enumerate(rows):
         fallback = _FALLBACK_QUESTIONS[i % len(_FALLBACK_QUESTIONS)]
         q = _generate_question(
@@ -132,11 +160,14 @@ def start_quiz():
             access_count=row["access_count"],
             complexity_score=row["complexity_score"],
             source_file=row["source_file"],
+            category=row.get("category") or "general",
             fallback_q=fallback,
         )
         questions.append(q)
+        session_map[q.id] = {"correct_index": q.correct_index, "chunk_id": row["id"]}
 
-    return QuizStartResponse(session_id=session_id, questions=questions)
+    _session_store[session_id] = session_map
+    return QuizStartResponse(session_id=session_id, questions=questions, created_at=now_iso)
 
 
 @router.post("/quiz/answer", response_model=QuizAnswerResponse)
@@ -154,4 +185,52 @@ def submit_answer(body: QuizAnswerRequest):
         correct_index=body.correct_index,
         new_retention=round(new_r, 4),
         message="Memory revived!" if correct else "Keep reviewing — you'll get it next time.",
+    )
+
+
+@router.post("/quiz/{session_id}/submit", response_model=QuizSubmitResponse)
+def submit_quiz(session_id: str, body: QuizSubmitRequest):
+    """Batch answer submission — matches frontend POST /api/quiz/{sessionId}/submit."""
+    session_map = _session_store.get(session_id, {})
+
+    results = []
+    score = 0
+    streak = 0
+    max_streak = 0
+    current_streak = 0
+
+    for answer in body.answers:
+        qid = answer.question_id
+        meta = session_map.get(qid, {})
+        correct_index = meta.get("correct_index", 0)
+        chunk_id = meta.get("chunk_id", qid)
+        correct = answer.selected_index == correct_index
+
+        stability_delta = 0.0
+        if correct and not chunk_id.startswith("fallback-"):
+            updated = update_chunk_access_by(chunk_id, delta=2, source="quiz")
+            stability_delta = 12.0
+            score += 1
+            current_streak += 1
+            max_streak = max(max_streak, current_streak)
+        else:
+            current_streak = 0
+            if not chunk_id.startswith("fallback-") and not correct:
+                stability_delta = -4.0
+
+        results.append(QuizResultItem(
+            question_id=qid,
+            correct=correct,
+            selected_index=answer.selected_index,
+            correct_index=correct_index,
+            stability_delta=stability_delta,
+        ))
+
+    return QuizSubmitResponse(
+        session_id=session_id,
+        score=score,
+        total=len(body.answers),
+        results=results,
+        xp_earned=score * 50,
+        streaks=max_streak,
     )

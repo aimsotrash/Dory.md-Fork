@@ -1,0 +1,21 @@
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+
+# Backend
+backend/.env
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.pyc
+backend/data/
+backend/*.db
+backend/*.db-wal
+backend/*.db-shm
+
+# Misc
+lecture pdf/
+lecture pdf.zip
+*.pyc
+__pycache__/

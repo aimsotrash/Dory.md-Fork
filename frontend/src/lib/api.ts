@@ -1,0 +1,148 @@
+import { config } from './config';
+import type {
+  HealthResponse,
+  DiscoveryResponse,
+  SearchResponse,
+  QuizSession,
+  QuizAnswer,
+  QuizResults,
+  IngestResponse,
+} from './types';
+
+import mockHealth from '@/data/mock_health.json';
+import mockChunks from '@/data/mock_chunks.json';
+import mockSearchResults from '@/data/mock_search_results.json';
+import mockDiscovery from '@/data/mock_discovery.json';
+import mockQuiz from '@/data/mock_quiz.json';
+
+async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${config.apiBaseUrl}${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...init,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`API ${res.status}: ${text}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+export async function getHealth(timeOffsetHours = 0): Promise<HealthResponse> {
+  if (config.useMocks) {
+    await sleep(300);
+    const base = mockHealth as HealthResponse;
+    if (timeOffsetHours === 0) return base;
+    const decay = Math.exp(-timeOffsetHours / 240);
+    return {
+      ...base,
+      time_offset_hours: timeOffsetHours,
+      categories: base.categories.map((c) => ({
+        ...c,
+        avg_retention: Math.max(0.02, c.avg_retention * decay),
+        urgency:
+          c.avg_retention * decay >= 0.7
+            ? 'low'
+            : c.avg_retention * decay >= 0.4
+            ? 'medium'
+            : 'high',
+      })),
+    };
+  }
+  return apiFetch<HealthResponse>(`/api/health?time_offset_hours=${timeOffsetHours}`);
+}
+
+export async function getDiscovery(): Promise<DiscoveryResponse> {
+  if (config.useMocks) {
+    await sleep(200);
+    return mockDiscovery as DiscoveryResponse;
+  }
+  return apiFetch<DiscoveryResponse>('/api/discovery');
+}
+
+export async function search(query: string): Promise<SearchResponse> {
+  if (config.useMocks) {
+    await sleep(400);
+    const results = (mockChunks as typeof mockChunks).filter((c) =>
+      c.content.toLowerCase().includes(query.toLowerCase()) ||
+      (c.tags ?? []).some((t) => t.toLowerCase().includes(query.toLowerCase()))
+    );
+    return {
+      results: results.map((c) => ({ chunk: c as SearchResponse['results'][0]['chunk'], score: 0.9, highlight: undefined })),
+      query,
+      total: results.length,
+    };
+  }
+  return apiFetch<SearchResponse>(`/api/search?q=${encodeURIComponent(query)}`);
+}
+
+export async function startQuiz(category?: string): Promise<QuizSession> {
+  if (config.useMocks) {
+    await sleep(500);
+    return mockQuiz as QuizSession;
+  }
+  const qs = category ? `?category=${category}` : '';
+  return apiFetch<QuizSession>(`/api/quiz/start${qs}`, { method: 'POST' });
+}
+
+export async function submitQuiz(
+  sessionId: string,
+  answers: QuizAnswer[]
+): Promise<QuizResults> {
+  if (config.useMocks) {
+    await sleep(600);
+    const correct = answers.filter(
+      (a, i) => a.selected_index === (mockQuiz as QuizSession).questions[i]?.correct_index
+    ).length;
+    return {
+      session_id: sessionId,
+      score: correct,
+      total: answers.length,
+      results: answers.map((a, i) => ({
+        question_id: a.question_id,
+        correct: a.selected_index === (mockQuiz as QuizSession).questions[i]?.correct_index,
+        selected_index: a.selected_index,
+        correct_index: (mockQuiz as QuizSession).questions[i]?.correct_index ?? 0,
+        stability_delta: a.selected_index === (mockQuiz as QuizSession).questions[i]?.correct_index ? 12 : -4,
+      })),
+      xp_earned: correct * 50,
+      streaks: correct,
+    };
+  }
+  return apiFetch<QuizResults>(`/api/quiz/${sessionId}/submit`, {
+    method: 'POST',
+    body: JSON.stringify({ answers }),
+  });
+}
+
+export async function ingestText(
+  content: string,
+  sourceType = 'note',
+  sourceName = 'manual_entry'
+): Promise<IngestResponse> {
+  if (config.useMocks) {
+    await sleep(800);
+    return {
+      chunk_id: `mock_${Date.now()}`,
+      category: 'general',
+      stability_S: 72,
+      complexity_k: 1.0,
+      message: 'Chunk ingested successfully (mock)',
+    };
+  }
+  return apiFetch<IngestResponse>('/api/ingest', {
+    method: 'POST',
+    body: JSON.stringify({ content, source_type: sourceType, source_name: sourceName }),
+  });
+}
+
+export async function getSearchResults(query: string): Promise<SearchResponse> {
+  if (config.useMocks && query === 'memory retention') {
+    await sleep(300);
+    return mockSearchResults as SearchResponse;
+  }
+  return search(query);
+}

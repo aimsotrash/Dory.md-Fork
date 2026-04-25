@@ -1,0 +1,42 @@
+{
+  "results": [
+    {
+      "chunk": {
+        "id": "c1",
+        "content": "The Ebbinghaus forgetting curve demonstrates that memory retention decays exponentially over time without reinforcement. The formula R(t) = e^(−t/S) models this decay where S represents memory stability.",
+        "source_type": "file",
+        "source_name": "cognitive_science_notes.md",
+        "category": "technical",
+        "created_at": "2024-01-15T10:00:00Z",
+        "last_accessed": "2024-03-10T14:30:00Z",
+        "access_count": 12,
+        "stability_S": 96,
+        "complexity_k": 1.2,
+        "retention": 0.85,
+        "tags": ["memory", "psychology", "learning"]
+      },
+      "score": 0.94,
+      "highlight": "The <mark>Ebbinghaus forgetting curve</mark> demonstrates that <mark>memory retention</mark> decays exponentially"
+    },
+    {
+      "chunk": {
+        "id": "c6",
+        "content": "React's useCallback hook memoizes a function so it maintains referential equality across renders. Use it when passing callbacks to optimized child components to prevent unnecessary re-renders.",
+        "source_type": "file",
+        "source_name": "react_patterns.md",
+        "category": "technical",
+        "created_at": "2024-01-28T14:00:00Z",
+        "last_accessed": "2024-03-11T16:00:00Z",
+        "access_count": 9,
+        "stability_S": 60,
+        "complexity_k": 1.0,
+        "retention": 0.78,
+        "tags": ["react", "hooks", "performance"]
+      },
+      "score": 0.71,
+      "highlight": "React's <mark>useCallback hook</mark> memoizes a function so it maintains referential equality"
+    }
+  ],
+  "query": "memory retention",
+  "total": 2
+}

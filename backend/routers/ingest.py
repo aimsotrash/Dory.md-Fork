@@ -1,10 +1,11 @@
+import math
+
 from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
 
 from core import chunker, complexity
 from core.embeddings import embed_texts
 from database.db import DEFAULT_USER_ID, insert_chunk
-from models.schemas import IngestResponse
+from models.schemas import IngestResponse, TextIngestRequest, TextIngestResponse
 from parsers.file_parser import parse
 from services.category_service import classify_and_store
 from services.chroma_service import add_chunks
@@ -65,3 +66,49 @@ async def ingest_files(
         last_source = upload.filename or "upload"
 
     return IngestResponse(chunks_created=total_chunks, source=last_source)
+
+
+@router.post("/ingest/text", response_model=TextIngestResponse)
+async def ingest_text(body: TextIngestRequest, background_tasks: BackgroundTasks):
+    """JSON ingest endpoint — matches frontend POST /api/ingest with text content."""
+    if not body.content.strip():
+        raise HTTPException(status_code=400, detail="Content cannot be empty.")
+
+    chunks = chunker.chunk_text(body.content)
+    if not chunks:
+        raise HTTPException(status_code=400, detail="Could not extract any chunks from content.")
+
+    scores = [complexity.score(c) for c in chunks]
+    embeddings = embed_texts(chunks)
+    source_name = body.source_name or "manual_entry"
+
+    chunk_ids: list[str] = []
+    for chunk_text, score in zip(chunks, scores):
+        cid = insert_chunk(
+            content=chunk_text,
+            source_file=source_name,
+            complexity_score=score,
+            user_id=DEFAULT_USER_ID,
+        )
+        chunk_ids.append(cid)
+
+    metadatas = [
+        {"user_id": DEFAULT_USER_ID, "chunk_id": cid, "source_file": source_name}
+        for cid in chunk_ids
+    ]
+    add_chunks(chunk_ids, embeddings, metadatas)
+
+    for cid, chunk_text in zip(chunk_ids, chunks):
+        background_tasks.add_task(classify_and_store, cid, chunk_text)
+
+    first_score = scores[0] if scores else 0.5
+    S = round((1.0 + 0.5 * math.log1p(0)) * 9.0, 2)
+    k = round(0.5 + 1.5 * max(0.0, min(1.0, first_score)), 3)
+
+    return TextIngestResponse(
+        chunk_id=chunk_ids[0],
+        category="general",
+        stability_S=S,
+        complexity_k=k,
+        message=f"Ingested {len(chunk_ids)} chunk(s). Category classification running in background.",
+    )

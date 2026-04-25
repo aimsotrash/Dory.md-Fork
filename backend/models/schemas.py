@@ -40,6 +40,8 @@ class CategoryHealth(BaseModel):
     weak: int
     critical: int
     total: int
+    count: int      # alias for total — matches frontend CategoryStat.count
+    urgency: str    # low | medium | high
 
 
 class HealthResponse(BaseModel):
@@ -98,17 +100,22 @@ class StatsResponse(BaseModel):
 # ── Quiz ─────────────────────────────────────────────────────────────────────
 
 class QuizQuestion(BaseModel):
+    id: str                 # question id (= chunk_id for lookup in submit)
     chunk_id: str
     question: str
     options: list[str]
     correct_index: int
+    difficulty: str         # easy | medium | hard (derived from complexity_score)
+    category: str
     retention: float
     source_file: str
+    hint: Optional[str] = None
 
 
 class QuizStartResponse(BaseModel):
     session_id: str
     questions: list[QuizQuestion]
+    created_at: str
 
 
 class QuizAnswerRequest(BaseModel):
@@ -122,6 +129,49 @@ class QuizAnswerResponse(BaseModel):
     correct: bool
     correct_index: int
     new_retention: float
+    message: str
+
+
+class QuizSubmitAnswer(BaseModel):
+    question_id: str
+    selected_index: int
+    time_taken_ms: int = 0
+
+
+class QuizSubmitRequest(BaseModel):
+    answers: list[QuizSubmitAnswer]
+
+
+class QuizResultItem(BaseModel):
+    question_id: str
+    correct: bool
+    selected_index: int
+    correct_index: int
+    stability_delta: float
+
+
+class QuizSubmitResponse(BaseModel):
+    session_id: str
+    score: int
+    total: int
+    results: list[QuizResultItem]
+    xp_earned: int
+    streaks: int
+
+
+# ── Text ingest (JSON body — frontend IngestResponse shape) ──────────────────
+
+class TextIngestRequest(BaseModel):
+    content: str
+    source_type: str = "note"
+    source_name: str = "manual_entry"
+
+
+class TextIngestResponse(BaseModel):
+    chunk_id: str
+    category: str
+    stability_S: float
+    complexity_k: float
     message: str
 
 
