@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useTheme, type Theme } from '@/contexts/ThemeContext';
 
 interface Toggle {
   label: string;
@@ -25,7 +26,7 @@ function ToggleRow({
       </div>
       <button onClick={() => onChange(!value)} className="shrink-0 transition-all duration-200">
         {value ? (
-          <ToggleRight size={28} className="text-nebula-400" />
+          <ToggleRight size={28} style={{ color: 'var(--primary)' }} />
         ) : (
           <ToggleLeft size={28} className="text-slate-600" />
         )}
@@ -35,6 +36,8 @@ function ToggleRow({
 }
 
 export function SettingsPage() {
+  const { theme, setTheme } = useTheme();
+
   const [toggles, setToggles] = useState({
     discoveryPolling: true,
     quizReminders: true,
@@ -45,7 +48,6 @@ export function SettingsPage() {
   });
 
   const [pollInterval, setPollInterval] = useState('30');
-  const [theme, setTheme] = useState<'cosmos' | 'midnight' | 'aurora'>('cosmos');
 
   function set(key: keyof typeof toggles) {
     return (v: boolean) => setToggles((p) => ({ ...p, [key]: v }));
@@ -84,6 +86,12 @@ export function SettingsPage() {
     },
   ] as const;
 
+  const themeOptions: { id: Theme; label: string; colors: string[] }[] = [
+    { id: 'cosmos', label: 'Cosmos', colors: ['#7c3aed', '#0891b2', '#f97316'] },
+    { id: 'midnight', label: 'Midnight', colors: ['#3b82f6', '#06b6d4', '#8b5cf6'] },
+    { id: 'aurora', label: 'Aurora', colors: ['#10b981', '#06b6d4', '#a78bfa'] },
+  ];
+
   return (
     <div className="max-w-2xl space-y-6">
       <div className="flex items-center gap-3">
@@ -97,7 +105,7 @@ export function SettingsPage() {
       </div>
 
       {sections.map(({ icon: Icon, title, color, bg, rows }) => (
-        <div key={title} className="glass-card p-5 space-y-1">
+        <div key={title} className="gcard p-5 space-y-1">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: bg }}>
               <Icon size={13} className={color} />
@@ -119,7 +127,7 @@ export function SettingsPage() {
       ))}
 
       {/* Poll interval */}
-      <div className="glass-card p-5 space-y-3">
+      <div className="gcard p-5 space-y-3">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-md bg-pulsar-500/10 flex items-center justify-center">
             <Clock size={13} className="text-pulsar-400" />
@@ -134,15 +142,16 @@ export function SettingsPage() {
             step={10}
             value={pollInterval}
             onChange={(e) => setPollInterval(e.target.value)}
-            className="flex-1 accent-purple-500"
+            className="flex-1"
+            style={{ accentColor: 'var(--primary)' }}
           />
-          <span className="text-sm font-mono text-nebula-400 w-16 text-right">{pollInterval}s</span>
+          <span className="text-sm font-mono w-16 text-right" style={{ color: 'var(--primary)' }}>{pollInterval}s</span>
         </div>
         <p className="text-xs text-slate-600">How often Dory checks for forgotten memories in the background</p>
       </div>
 
       {/* Theme */}
-      <div className="glass-card p-5 space-y-3">
+      <div className="gcard p-5 space-y-3">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-md bg-flare-500/10 flex items-center justify-center">
             <Palette size={13} className="text-flare-400" />
@@ -150,20 +159,21 @@ export function SettingsPage() {
           <h2 className="text-sm font-semibold text-slate-200">Color theme</h2>
         </div>
         <div className="flex gap-2">
-          {([
-            { id: 'cosmos', label: 'Cosmos', colors: ['#7c3aed', '#0891b2', '#f97316'] },
-            { id: 'midnight', label: 'Midnight', colors: ['#3b82f6', '#06b6d4', '#8b5cf6'] },
-            { id: 'aurora', label: 'Aurora', colors: ['#10b981', '#06b6d4', '#a78bfa'] },
-          ] as const).map(({ id, label, colors }) => (
+          {themeOptions.map(({ id, label, colors }) => (
             <button
               key={id}
               onClick={() => setTheme(id)}
               className={cn(
                 'flex-1 py-3 rounded-lg border text-xs font-medium transition-all duration-200',
                 theme === id
-                  ? 'border-nebula-500/60 bg-nebula-500/10 text-nebula-300'
+                  ? 'text-white'
                   : 'border-cosmos-700 bg-cosmos-800/40 text-slate-500 hover:text-slate-300 hover:border-cosmos-600'
               )}
+              style={theme === id ? {
+                background: `linear-gradient(135deg, ${colors[0]}22 0%, ${colors[1]}15 100%)`,
+                borderColor: `${colors[0]}55`,
+                color: colors[0],
+              } : {}}
             >
               <div className="flex justify-center gap-1 mb-1.5">
                 {colors.map((c) => (
@@ -171,13 +181,16 @@ export function SettingsPage() {
                 ))}
               </div>
               {label}
+              {theme === id && (
+                <div className="text-[10px] mt-0.5 opacity-70">Active</div>
+              )}
             </button>
           ))}
         </div>
       </div>
 
       {/* About */}
-      <div className="glass-card p-4 flex items-center gap-3">
+      <div className="gcard p-4 flex items-center gap-3">
         <Info size={14} className="text-slate-600 shrink-0" />
         <div className="flex-1">
           <p className="text-xs text-slate-500">

@@ -1,247 +1,438 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { marked } from 'marked'
 import { ingestText, notionStatus, listNotionPages, createNotionPage } from '@/lib/api'
+import { useNotes } from '@/hooks/useNotes'
 import type { NotionPage } from '@/lib/types'
+import {
+  Plus, Trash2, Search, FileText, Eye, Edit3,
+  Download, Upload, ChevronRight, Clock,
+} from 'lucide-react'
 
-const TOOLBAR = [
-  { label: 'H1', action: (t: string) => `# ${t}` },
-  { label: 'H2', action: (t: string) => `## ${t}` },
-  { label: 'B',  action: (t: string) => `**${t}**` },
-  { label: 'I',  action: (t: string) => `*${t}*` },
-  { label: '`',  action: (t: string) => `\`${t}\`` },
-  { label: '```',action: (t: string) => `\`\`\`\n${t}\n\`\`\`` },
-  { label: '>',  action: (t: string) => `> ${t}` },
-  { label: '-',  action: (t: string) => `- ${t}` },
+const SLASH_COMMANDS = [
+  { cmd: '/h1',      label: 'Heading 1',    icon: 'H1', insert: () => '# '           },
+  { cmd: '/h2',      label: 'Heading 2',    icon: 'H2', insert: () => '## '          },
+  { cmd: '/h3',      label: 'Heading 3',    icon: 'H3', insert: () => '### '         },
+  { cmd: '/bullet',  label: 'Bullet list',  icon: '•',  insert: () => '- '           },
+  { cmd: '/num',     label: 'Numbered',     icon: '1.', insert: () => '1. '          },
+  { cmd: '/code',    label: 'Code block',   icon: '<>', insert: () => '```\n\n```\n' },
+  { cmd: '/quote',   label: 'Blockquote',   icon: '"',  insert: () => '> '           },
+  { cmd: '/divider', label: 'Divider',      icon: '—',  insert: () => '\n---\n'      },
+  { cmd: '/bold',    label: 'Bold',         icon: 'B',  insert: () => '**text**'     },
+  { cmd: '/italic',  label: 'Italic',       icon: 'I',  insert: () => '*text*'       },
 ]
 
-type SaveMode = 'local' | 'notion' | 'dory'
+type SaveMode = 'dory' | 'local' | 'notion'
+
+function formatRelative(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  return `${Math.floor(h / 24)}d ago`
+}
 
 export function NoteEditorPage() {
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
+  const { notes, createNote, updateNote, deleteNote } = useNotes()
+  const [activeId, setActiveId] = useState<string | null>(() => notes[0]?.id ?? null)
+  const [search, setSearch] = useState('')
   const [preview, setPreview] = useState(false)
   const [saveMode, setSaveMode] = useState<SaveMode>('dory')
+  const [saving, setSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null)
+  const [slashVisible, setSlashVisible] = useState(false)
+  const [slashFilter, setSlashFilter] = useState('')
   const [notionConnected, setNotionConnected] = useState(false)
   const [notionPages, setNotionPages] = useState<NotionPage[]>([])
   const [selectedParentId, setSelectedParentId] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [status, setStatus] = useState<string | null>(null)
+
+  const editorRef = useRef<HTMLTextAreaElement>(null)
+  const titleRef = useRef<HTMLInputElement>(null)
+  const active = notes.find(n => n.id === activeId) ?? null
+
+  useEffect(() => {
+    if (!activeId && notes.length > 0) setActiveId(notes[0].id)
+  }, [notes.length])
 
   useEffect(() => {
     if (saveMode === 'notion' && !notionConnected) {
-      notionStatus()
-        .then(s => {
-          setNotionConnected(s.connected)
-          if (s.connected) {
-            listNotionPages().then(pages => {
-              setNotionPages(pages)
-              if (pages.length) setSelectedParentId(pages[0].id)
-            }).catch(() => {})
-          }
-        })
-        .catch(() => {})
+      notionStatus().then(s => {
+        setNotionConnected(s.connected)
+        if (s.connected) {
+          listNotionPages().then(pages => {
+            setNotionPages(pages)
+            if (pages.length) setSelectedParentId(pages[0].id)
+          }).catch(() => {})
+        }
+      }).catch(() => {})
     }
   }, [saveMode])
 
-  const renderedHtml = marked.parse(content || '*Start writing...*') as string
+  const handleNewNote = useCallback(() => {
+    const n = createNote()
+    setActiveId(n.id)
+    setTimeout(() => titleRef.current?.focus(), 50)
+  }, [createNote])
 
-  function applyFormat(action: (t: string) => string) {
-    const ta = document.getElementById('editor') as HTMLTextAreaElement
-    if (!ta) return
-    const start = ta.selectionStart
-    const end = ta.selectionEnd
-    const selected = content.slice(start, end) || 'text'
-    const formatted = action(selected)
-    const next = content.slice(0, start) + formatted + content.slice(end)
-    setContent(next)
-  }
+  const handleContentChange = useCallback((val: string, ta: HTMLTextAreaElement) => {
+    if (!activeId) return
+    updateNote(activeId, { content: val })
 
-  function downloadMd() {
-    const blob = new Blob([`# ${title}\n\n${content}`], { type: 'text/markdown' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `${title.replace(/\s+/g, '-').toLowerCase() || 'note'}.md`
-    a.click()
-    setStatus('Downloaded as .md')
-    setTimeout(() => setStatus(null), 2000)
-  }
+    const cursor = ta.selectionStart
+    const lineStart = val.lastIndexOf('\n', cursor - 1) + 1
+    const line = val.slice(lineStart, cursor)
 
-  async function saveToNotion() {
-    if (!selectedParentId) { setStatus('Select a parent page first'); return }
-    setSaving(true)
-    try {
-      await createNotionPage({ title: title || 'Untitled', content, parent_id: selectedParentId })
-      setStatus('Saved to Notion ✓')
-      setTimeout(() => setStatus(null), 2500)
-    } catch (e: any) {
-      setStatus(`Error: ${e.message}`)
-    } finally { setSaving(false) }
-  }
+    if (line.startsWith('/')) {
+      setSlashFilter(line.slice(1).toLowerCase())
+      setSlashVisible(true)
+    } else {
+      setSlashVisible(false)
+    }
+  }, [activeId, updateNote])
 
-  async function saveToDory() {
-    if (!content.trim()) return
-    setSaving(true)
-    try {
-      await ingestText(`# ${title}\n\n${content}`, 'note', title || 'note')
-      setStatus('Indexed in Dory ✓')
-      setTimeout(() => setStatus(null), 2500)
-    } catch (e: any) {
-      setStatus(`Error: ${e.message}`)
-    } finally { setSaving(false) }
+  const applySlash = useCallback((insert: () => string) => {
+    if (!editorRef.current || !active) return
+    const ta = editorRef.current
+    const val = active.content
+    const cursor = ta.selectionStart
+    const lineStart = val.lastIndexOf('\n', cursor - 1) + 1
+    const replacement = insert()
+    const newVal = val.slice(0, lineStart) + replacement + val.slice(cursor)
+    updateNote(active.id, { content: newVal })
+    setSlashVisible(false)
+    setTimeout(() => {
+      ta.focus()
+      const pos = lineStart + replacement.length
+      ta.setSelectionRange(pos, pos)
+    }, 10)
+  }, [active, updateNote])
+
+  const handleFileImport = useCallback((files: FileList | null) => {
+    if (!files?.length) return
+    Array.from(files).forEach(async (file) => {
+      const ext = file.name.split('.').pop()?.toLowerCase()
+      if (ext === 'md' || ext === 'txt') {
+        const text = await file.text()
+        const n = createNote()
+        updateNote(n.id, {
+          title: file.name.replace(/\.(md|txt)$/, ''),
+          content: text,
+        })
+        setActiveId(n.id)
+      } else if (ext === 'doc' || ext === 'docx') {
+        try {
+          // @ts-ignore — mammoth is optional; prompt user to install if missing
+          const mammoth = await import('mammoth/mammoth.browser')
+          const buf = await file.arrayBuffer()
+          const result = await mammoth.extractRawText({ arrayBuffer: buf })
+          const n = createNote()
+          updateNote(n.id, {
+            title: file.name.replace(/\.(docx?)$/, ''),
+            content: result.value,
+          })
+          setActiveId(n.id)
+        } catch {
+          alert(`Could not parse ${file.name}. Run: npm i mammoth`)
+        }
+      }
+    })
+  }, [createNote, updateNote])
+
+  function flash(type: 'ok' | 'err', msg: string) {
+    setSaveStatus({ type, msg })
+    setTimeout(() => setSaveStatus(null), 2500)
   }
 
   async function handleSave() {
-    if (saveMode === 'local') downloadMd()
-    else if (saveMode === 'notion') await saveToNotion()
-    else await saveToDory()
+    if (!active) return
+    if (saveMode === 'local') {
+      const blob = new Blob([`# ${active.title}\n\n${active.content}`], { type: 'text/markdown' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `${(active.title || 'note').replace(/\s+/g, '-').toLowerCase()}.md`
+      a.click()
+      flash('ok', 'Downloaded .md')
+      return
+    }
+    setSaving(true)
+    try {
+      if (saveMode === 'notion') {
+        if (!selectedParentId) { flash('err', 'Select a parent page'); return }
+        await createNotionPage({ title: active.title || 'Untitled', content: active.content, parent_id: selectedParentId })
+        flash('ok', 'Saved to Notion')
+      } else {
+        await ingestText(`# ${active.title}\n\n${active.content}`, 'note', active.title || 'note')
+        flash('ok', 'Indexed in Dory')
+      }
+    } catch (e: any) {
+      flash('err', e.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
+  const filtered = notes.filter(n =>
+    !search || n.title.toLowerCase().includes(search) || n.content.toLowerCase().includes(search)
+  )
+
+  const filteredSlash = SLASH_COMMANDS.filter(c =>
+    c.cmd.slice(1).startsWith(slashFilter) || c.label.toLowerCase().startsWith(slashFilter)
+  )
+
+  const wordCount = (active?.content ?? '').split(/\s+/).filter(Boolean).length
+  const renderedHtml = marked.parse(active?.content ?? '') as string
+
   return (
-    <div className="max-w-6xl mx-auto animate-fade-up">
-      {/* Page header */}
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="font-display font-bold text-2xl text-ink-50 tracking-tight">Note Editor</h1>
-          <p className="label mt-1">Markdown editor — write, preview, save</p>
-        </div>
+    <div className="flex h-[calc(100vh-49px)] overflow-hidden animate-fade-in">
 
-        <div className="flex items-center gap-3">
-          {status && (
-            <span className="text-xs font-mono text-metro-teal border border-metro-teal/30 px-2 py-1">
-              {status}
-            </span>
-          )}
-
-          {/* Save mode selector */}
-          <div className="flex border border-ink-600">
-            {(['dory', 'local', 'notion'] as SaveMode[]).map(m => (
-              <button
-                key={m}
-                onClick={() => setSaveMode(m)}
-                className={`px-3 py-1.5 text-xs font-mono uppercase tracking-wider transition-all ${
-                  saveMode === m
-                    ? 'bg-metro-amber text-ink-900 font-bold'
-                    : 'text-ink-300 hover:text-ink-100 hover:bg-ink-700'
-                }`}
-              >
-                {m === 'dory' ? '◈ Dory' : m === 'local' ? '⬇ Local' : 'N Notion'}
-              </button>
-            ))}
+      {/* ── Notes sidebar ─────────────────────────────────────────────── */}
+      <aside
+        className="w-60 shrink-0 flex flex-col"
+        style={{ background: 'rgba(5,8,16,0.7)', borderRight: '1px solid rgba(255,255,255,0.06)' }}
+      >
+        <div className="p-3 space-y-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono font-semibold text-slate-500 uppercase tracking-widest">Notes</span>
+            <button
+              onClick={handleNewNote}
+              title="New note"
+              className="w-5 h-5 rounded-md flex items-center justify-center text-slate-500 hover:text-white transition-colors"
+              style={{ background: 'rgba(255,255,255,0.06)' }}
+            >
+              <Plus size={12} />
+            </button>
           </div>
-
-          <button
-            className="btn-primary"
-            onClick={handleSave}
-            disabled={saving || (!content.trim() && saveMode !== 'local')}
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </button>
+          <div className="relative">
+            <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-700" />
+            <input
+              className="w-full pl-7 pr-2 py-1.5 text-xs rounded-lg outline-none text-slate-300 placeholder-slate-700"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.06)' }}
+              placeholder="Search..."
+              value={search}
+              onChange={e => setSearch(e.target.value.toLowerCase())}
+            />
+          </div>
         </div>
-      </div>
 
-      {/* Notion config panel */}
-      {saveMode === 'notion' && (
-        <div className="tile tile-teal p-4 mb-4">
-          {notionConnected ? (
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <label className="label mb-1 block">Save under page</label>
-                {notionPages.length > 0 ? (
+        <div className="flex-1 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-32 gap-2">
+              <FileText size={18} className="text-slate-700" />
+              <p className="text-xs text-slate-700">No notes yet</p>
+              <button onClick={handleNewNote} className="text-[11px] text-nebula-400 hover:text-nebula-300">
+                New note →
+              </button>
+            </div>
+          ) : (
+            filtered.map(note => (
+              <button
+                key={note.id}
+                onClick={() => setActiveId(note.id)}
+                className="w-full text-left px-3 py-2.5 group relative"
+                style={note.id === activeId
+                  ? { background: 'rgba(124,58,237,0.12)', borderLeft: '2px solid rgba(124,58,237,0.5)' }
+                  : { borderLeft: '2px solid transparent' }
+                }
+              >
+                <div className="flex items-center justify-between">
+                  <p className={`text-xs font-medium truncate flex-1 ${note.id === activeId ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>
+                    {note.title || 'Untitled'}
+                  </p>
+                  <button
+                    onClick={e => {
+                      e.stopPropagation()
+                      const next = notes.find(n => n.id !== note.id)?.id ?? null
+                      if (activeId === note.id) setActiveId(next)
+                      deleteNote(note.id)
+                    }}
+                    className="opacity-0 group-hover:opacity-100 text-slate-700 hover:text-red-400 transition-all ml-1"
+                  >
+                    <Trash2 size={10} />
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-700 mt-0.5 truncate">
+                  {note.content.slice(0, 55) || 'Empty'}
+                </p>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <Clock size={8} className="text-slate-800" />
+                  <span className="text-[9px] text-slate-800">{formatRelative(note.updated_at)}</span>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+
+        <div className="p-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-600 hover:text-slate-300 transition-colors">
+            <Upload size={11} />
+            <span>Import .md / .txt / .docx</span>
+            <input type="file" accept=".md,.txt,.doc,.docx" multiple className="hidden"
+              onChange={e => handleFileImport(e.target.files)} />
+          </label>
+        </div>
+      </aside>
+
+      {/* ── Editor ────────────────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {active ? (
+          <>
+            {/* Top bar */}
+            <div
+              className="flex items-center justify-between px-5 py-2 shrink-0"
+              style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(5,8,16,0.5)' }}
+            >
+              <div className="flex items-center gap-2">
+                <div className="flex rounded-lg overflow-hidden text-xs" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <button
+                    onClick={() => setPreview(false)}
+                    className={`flex items-center gap-1 px-3 py-1.5 transition-all ${!preview ? 'bg-nebula-500/20 text-nebula-300' : 'text-slate-600 hover:text-slate-300'}`}
+                  >
+                    <Edit3 size={11} /> Write
+                  </button>
+                  <button
+                    onClick={() => setPreview(true)}
+                    className={`flex items-center gap-1 px-3 py-1.5 transition-all ${preview ? 'bg-nebula-500/20 text-nebula-300' : 'text-slate-600 hover:text-slate-300'}`}
+                  >
+                    <Eye size={11} /> Preview
+                  </button>
+                </div>
+                {wordCount > 0 && <span className="text-[10px] font-mono text-slate-700">{wordCount}w</span>}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {saveStatus && (
+                  <span className={`text-xs px-2 py-1 rounded-lg ${saveStatus.type === 'ok' ? 'text-emerald-400 bg-emerald-500/10' : 'text-red-400 bg-red-500/10'}`}>
+                    {saveStatus.msg}
+                  </span>
+                )}
+
+                <div className="flex rounded-lg overflow-hidden text-xs" style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
+                  {(['dory', 'local', 'notion'] as SaveMode[]).map(m => (
+                    <button
+                      key={m}
+                      onClick={() => setSaveMode(m)}
+                      className={`px-2.5 py-1.5 transition-all ${saveMode === m ? 'bg-nebula-500/20 text-nebula-300' : 'text-slate-600 hover:text-slate-300'}`}
+                    >
+                      {m === 'dory' ? '◈' : m === 'local' ? '↓' : 'N'}
+                    </button>
+                  ))}
+                </div>
+
+                {saveMode === 'notion' && notionConnected && notionPages.length > 0 && (
                   <select
-                    className="input w-full"
+                    className="text-xs rounded-lg px-2 py-1.5 text-slate-300 outline-none"
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
                     value={selectedParentId}
                     onChange={e => setSelectedParentId(e.target.value)}
                   >
-                    {notionPages.map(p => (
-                      <option key={p.id} value={p.id}>{p.title}</option>
-                    ))}
+                    {notionPages.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
                   </select>
-                ) : (
-                  <p className="text-xs font-mono text-ink-400">No pages found — share pages with your integration first.</p>
                 )}
+                {saveMode === 'notion' && !notionConnected && (
+                  <Link to="/notion" className="text-xs text-nebula-400 hover:text-nebula-300 flex items-center gap-0.5">
+                    Connect <ChevronRight size={10} />
+                  </Link>
+                )}
+
+                <button
+                  onClick={handleSave}
+                  disabled={saving || (!active.content.trim() && saveMode !== 'local')}
+                  className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1"
+                >
+                  {saving ? 'Saving…' : saveMode === 'local' ? <><Download size={11} /> Export</> : 'Save'}
+                </button>
               </div>
             </div>
-          ) : (
-            <div className="flex items-center gap-4">
-              <p className="text-sm font-mono text-ink-300 flex-1">
-                Not connected to Notion.
-              </p>
-              <Link to="/notion" className="btn-primary text-xs">
-                Connect Notion →
-              </Link>
+
+            {/* Writing area */}
+            <div className="flex-1 overflow-y-auto relative">
+              {!preview ? (
+                <div className="max-w-2xl mx-auto px-8 pt-10 pb-20">
+                  {/* Notion-style big title */}
+                  <input
+                    ref={titleRef}
+                    className="w-full bg-transparent outline-none text-[2rem] font-bold text-white placeholder-slate-800 mb-1 border-none leading-tight"
+                    placeholder="Untitled"
+                    value={active.title}
+                    onChange={e => updateNote(active.id, { title: e.target.value })}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); editorRef.current?.focus() } }}
+                  />
+                  <div className="h-px mb-6" style={{ background: 'rgba(255,255,255,0.04)' }} />
+
+                  {/* Body */}
+                  <div className="relative">
+                    <textarea
+                      ref={editorRef}
+                      className="w-full bg-transparent outline-none resize-none leading-8 placeholder-slate-800 text-slate-200 text-base"
+                      style={{ minHeight: 'calc(100vh - 320px)', caretColor: '#a78bfa', fontFamily: 'inherit' }}
+                      placeholder={"Write something, or type / for blocks…"}
+                      value={active.content}
+                      onChange={e => handleContentChange(e.target.value, e.target)}
+                      onKeyDown={e => {
+                        if (e.key === 'Escape') setSlashVisible(false)
+                      }}
+                      spellCheck
+                    />
+
+                    {/* Slash command popup */}
+                    {slashVisible && filteredSlash.length > 0 && (
+                      <div
+                        className="absolute z-50 rounded-xl overflow-hidden"
+                        style={{
+                          top: '2rem',
+                          left: 0,
+                          background: 'rgba(10,14,26,0.97)',
+                          border: '1px solid rgba(124,58,237,0.3)',
+                          boxShadow: '0 20px 60px rgba(0,0,0,0.8)',
+                          minWidth: '200px',
+                        }}
+                      >
+                        <p className="px-3 py-1.5 text-[9px] font-mono text-slate-700 uppercase tracking-widest border-b"
+                          style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+                          Insert block
+                        </p>
+                        {filteredSlash.slice(0, 7).map(cmd => (
+                          <button
+                            key={cmd.cmd}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-300 hover:bg-nebula-500/10 hover:text-white transition-colors text-left"
+                            onMouseDown={e => { e.preventDefault(); applySlash(cmd.insert) }}
+                          >
+                            <span className="w-5 h-5 rounded text-[10px] font-bold text-nebula-400 flex items-center justify-center shrink-0"
+                              style={{ background: 'rgba(124,58,237,0.15)' }}>
+                              {cmd.icon}
+                            </span>
+                            <span className="flex-1">{cmd.label}</span>
+                            <span className="text-[9px] text-slate-700 font-mono">{cmd.cmd}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="max-w-2xl mx-auto px-8 pt-10 pb-20">
+                  <h1 className="text-[2rem] font-bold text-white mb-6 leading-tight">
+                    {active.title || 'Untitled'}
+                  </h1>
+                  <div className="md-preview leading-8" dangerouslySetInnerHTML={{ __html: renderedHtml }} />
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      )}
-
-      {/* Title */}
-      <input
-        className="w-full bg-transparent border-b border-ink-600 focus:border-metro-amber outline-none text-2xl font-display font-bold text-ink-50 pb-3 mb-4 placeholder-ink-500 transition-colors"
-        placeholder="Note title..."
-        value={title}
-        onChange={e => setTitle(e.target.value)}
-      />
-
-      {/* Toolbar */}
-      <div className="flex items-center gap-1 mb-0 bg-ink-800 border border-ink-600 border-b-0 px-3 py-2">
-        {TOOLBAR.map(({ label, action }) => (
-          <button
-            key={label}
-            onClick={() => applyFormat(action)}
-            className="px-2.5 py-1 text-xs font-mono text-ink-300 hover:text-metro-amber hover:bg-ink-700 transition-colors"
-          >
-            {label}
-          </button>
-        ))}
-        <div className="ml-auto flex gap-1">
-          <button
-            onClick={() => setPreview(false)}
-            className={`px-3 py-1 text-xs font-mono transition-colors ${!preview ? 'bg-metro-amber text-ink-900' : 'text-ink-400 hover:text-ink-200'}`}
-          >
-            WRITE
-          </button>
-          <button
-            onClick={() => setPreview(true)}
-            className={`px-3 py-1 text-xs font-mono transition-colors ${preview ? 'bg-metro-amber text-ink-900' : 'text-ink-400 hover:text-ink-200'}`}
-          >
-            PREVIEW
-          </button>
-        </div>
-      </div>
-
-      {/* Editor / Preview */}
-      <div className="border border-ink-600 bg-ink-800" style={{ minHeight: '520px' }}>
-        {!preview ? (
-          <textarea
-            id="editor"
-            className="w-full h-full bg-transparent text-ink-100 font-mono text-sm p-5 outline-none resize-none leading-relaxed placeholder-ink-500"
-            style={{ minHeight: '520px' }}
-            placeholder="Start writing in Markdown...&#10;&#10;# Heading&#10;**bold**, *italic*, `code`&#10;&#10;- bullet point&#10;> blockquote"
-            value={content}
-            onChange={e => setContent(e.target.value)}
-            spellCheck
-          />
+          </>
         ) : (
-          <div
-            className="p-5 md-preview"
-            style={{ minHeight: '520px' }}
-            dangerouslySetInnerHTML={{ __html: renderedHtml }}
-          />
+          <div className="flex-1 flex flex-col items-center justify-center gap-4">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+              style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.15)' }}>
+              <FileText size={22} className="text-slate-700" />
+            </div>
+            <p className="text-sm text-slate-600">No note selected</p>
+            <button onClick={handleNewNote} className="btn-primary flex items-center gap-2 px-4 py-2 text-sm">
+              <Plus size={14} /> New note
+            </button>
+          </div>
         )}
-      </div>
-
-      {/* Word count */}
-      <div className="flex gap-4 mt-2">
-        <span className="text-[10px] font-mono text-ink-500">
-          {content.split(/\s+/).filter(Boolean).length} words
-        </span>
-        <span className="text-[10px] font-mono text-ink-500">
-          {content.length} chars
-        </span>
-        <span className="text-[10px] font-mono text-ink-500">
-          ~{Math.ceil(content.split(/\s+/).filter(Boolean).length / 200)} min read
-        </span>
       </div>
     </div>
   )
