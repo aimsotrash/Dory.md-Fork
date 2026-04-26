@@ -7,18 +7,21 @@ Collection: dory_chunks
   - Persisted at ./data/chroma
 """
 
+from __future__ import annotations
+
 from pathlib import Path
+from typing import Optional
 
 import chromadb
 from chromadb.config import Settings
 
-_client: chromadb.PersistentClient | None = None
+_client: Optional[chromadb.ClientAPI] = None
 _collection = None
 COLLECTION_NAME = "dory_chunks"
 CHROMA_PATH = Path(__file__).parent.parent / "data" / "chroma"
 
 
-def _get_client() -> chromadb.PersistentClient:
+def _get_client() -> chromadb.ClientAPI:
     global _client
     if _client is None:
         CHROMA_PATH.mkdir(parents=True, exist_ok=True)
