@@ -104,7 +104,7 @@ def _to_chunk_full(row: dict, retention: float) -> dict:
     S = round((1.0 + 0.5 * math.log(1 + access_count)) * 9.0, 2)
     k = round(0.5 + 1.5 * max(0.0, min(1.0, complexity_score)), 3)
 
-    source_file = row.get("source_file", "")
+    source_file = row["source_file"] or ""
     if source_file.startswith("Notion:"):
         source_type, source_name = "url", source_file[7:].strip()
     elif "." in source_file and source_file.rsplit(".", 1)[-1].lower() in (
@@ -121,7 +121,7 @@ def _to_chunk_full(row: dict, retention: float) -> dict:
         "content": row["content"][:400],
         "source_type": source_type,
         "source_name": source_name,
-        "category": row.get("category") or "general",
+        "category": row["category"] or "general",
         "created_at": row["created_at"],
         "last_accessed": row["last_accessed"],
         "access_count": access_count,

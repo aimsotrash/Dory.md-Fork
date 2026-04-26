@@ -50,6 +50,19 @@ export function QuizPage() {
         setLoading(true);
         try {
           const res = await submitQuiz(session.session_id, newAnswers);
+          
+          try {
+            const historyObj = JSON.parse(localStorage.getItem('dory_quiz_history') ?? '[]');
+            historyObj.push({
+              score: res.score,
+              total: res.total,
+              date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+            });
+            localStorage.setItem('dory_quiz_history', JSON.stringify(historyObj));
+          } catch (err) {
+            console.error('Failed to save quiz history', err);
+          }
+
           setResults(res);
           setPhase('results');
         } catch (e) {

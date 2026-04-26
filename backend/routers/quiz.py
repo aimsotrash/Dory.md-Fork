@@ -160,7 +160,7 @@ def start_quiz():
             access_count=row["access_count"],
             complexity_score=row["complexity_score"],
             source_file=row["source_file"],
-            category=row.get("category") or "general",
+            category=row["category"] or "general",
             fallback_q=fallback,
         )
         questions.append(q)
