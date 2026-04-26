@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Brain, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2, Brain, CheckCircle2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
 export function LoginPage() {
@@ -13,82 +13,155 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+
+  function switchMode(m: 'login' | 'register') {
+    setMode(m)
+    setError('')
+    setSuccess('')
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    setSuccess('')
     setLoading(true)
 
-    await new Promise(r => setTimeout(r, 400))
+    await new Promise(r => setTimeout(r, 300))
 
     if (mode === 'login') {
       const ok = login(email, password)
-      if (!ok) setError('Invalid email or password.')
-      else navigate('/')
+      if (!ok) {
+        setError('Invalid email or password.')
+        setLoading(false)
+      } else {
+        navigate('/')
+      }
     } else {
-      if (name.trim().length < 2) { setError('Name must be at least 2 characters.'); setLoading(false); return }
+      if (name.trim().length < 2) {
+        setError('Name must be at least 2 characters.')
+        setLoading(false)
+        return
+      }
+      if (password.length < 6) { setError('Password must be at least 6 characters.'); setLoading(false); return }
       const ok = register(name.trim(), email, password)
-      if (!ok) setError('An account with that email already exists.')
-      else navigate('/')
+      if (!ok) {
+        setError('An account with that email already exists.')
+        setLoading(false)
+      } else {
+        setSuccess('Account created! Sign in to continue.')
+        setName('')
+        setEmail('')
+        setPassword('')
+        setLoading(false)
+        setTimeout(() => switchMode('login'), 1200)
+      }
     }
-
-    setLoading(false)
   }
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
-      style={{ background: '#050810' }}
+      className="min-h-screen flex"
+      style={{ background: '#0a0a0a' }}
     >
-      {/* Aurora orbs */}
-      <div className="aurora-orb aurora-1" />
-      <div className="aurora-orb aurora-2" />
-      <div className="aurora-orb aurora-3" />
-
-      <div className="relative z-10 w-full max-w-sm">
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
+      {/* Left panel — branding */}
+      <div
+        className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 p-10"
+        style={{
+          background: '#111111',
+          borderRight: '1px solid #1f1f1f',
+        }}
+      >
+        <div className="flex items-center gap-2.5">
           <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-            style={{
-              background: 'linear-gradient(135deg, rgba(124,58,237,0.3) 0%, rgba(8,145,178,0.2) 100%)',
-              border: '1px solid rgba(124,58,237,0.4)',
-              boxShadow: '0 0 40px rgba(124,58,237,0.3)',
-            }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ background: '#7c3aed' }}
           >
-            <Brain size={24} className="text-nebula-300" />
+            <Brain size={16} className="text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Dory.md</h1>
-          <p className="text-sm text-slate-500 mt-1">Your second brain, always remembered</p>
+          <span className="font-semibold text-white text-sm tracking-wide">Dory.md</span>
         </div>
 
-        {/* Card */}
-        <div className="gcard p-6">
+        <div className="space-y-6">
+          <blockquote className="space-y-3">
+            <p className="text-xl font-medium text-white leading-snug">
+              "The notes app that remembers so you don't have to forget."
+            </p>
+            <footer className="text-sm text-[#666]">
+              UWB Hacks 2026 · Track 2: Human Experience
+            </footer>
+          </blockquote>
+
+          <div className="space-y-3">
+            {[
+              'Ebbinghaus forgetting curve per knowledge chunk',
+              'BM25 + dense hybrid search with RRF',
+              'AI-generated quiz from your fading memories',
+            ].map(f => (
+              <div key={f} className="flex items-start gap-2.5">
+                <div className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: '#7c3aed' }} />
+                <span className="text-sm text-[#888]">{f}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="text-xs text-[#444]">© 2026 Dory.md</p>
+      </div>
+
+      {/* Right panel — form */}
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="w-full max-w-[360px] space-y-6">
+
+          {/* Mobile logo */}
+          <div className="flex lg:hidden items-center gap-2.5 mb-2">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: '#7c3aed' }}>
+              <Brain size={16} className="text-white" />
+            </div>
+            <span className="font-semibold text-white text-sm">Dory.md</span>
+          </div>
+
+          <div>
+            <h1 className="text-xl font-semibold text-white">
+              {mode === 'login' ? 'Welcome back' : 'Create your account'}
+            </h1>
+            <p className="text-sm mt-1" style={{ color: '#666' }}>
+              {mode === 'login'
+                ? 'Sign in to access your knowledge base'
+                : 'Start building your second brain'}
+            </p>
+          </div>
+
           {/* Tab switcher */}
-          <div className="flex rounded-xl overflow-hidden mb-6" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div
+            className="flex rounded-lg p-0.5"
+            style={{ background: '#161616', border: '1px solid #222' }}
+          >
             {(['login', 'register'] as const).map(m => (
               <button
                 key={m}
-                onClick={() => { setMode(m); setError('') }}
-                className="flex-1 py-2 text-sm font-medium transition-all duration-200"
-                style={mode === m ? {
-                  background: 'linear-gradient(135deg, rgba(124,58,237,0.3) 0%, rgba(124,58,237,0.15) 100%)',
-                  color: '#c4b5fd',
-                  borderRadius: '10px',
-                } : { color: '#64748b' }}
+                type="button"
+                onClick={() => switchMode(m)}
+                className="flex-1 py-1.5 text-sm font-medium rounded-md transition-all duration-150"
+                style={mode === m
+                  ? { background: '#222', color: '#fff' }
+                  : { color: '#555' }
+                }
               >
-                {m === 'login' ? 'Sign in' : 'Create account'}
+                {m === 'login' ? 'Sign in' : 'Register'}
               </button>
             ))}
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3">
             {mode === 'register' && (
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">Name</label>
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium" style={{ color: '#888' }}>
+                  Full name
+                </label>
                 <input
-                  className="input-field w-full"
+                  className="corp-input w-full"
                   placeholder="Your name"
                   value={name}
                   onChange={e => setName(e.target.value)}
@@ -98,10 +171,12 @@ export function LoginPage() {
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Email</label>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium" style={{ color: '#888' }}>
+                Email
+              </label>
               <input
-                className="input-field w-full"
+                className="corp-input w-full"
                 type="email"
                 placeholder="you@example.com"
                 value={email}
@@ -111,51 +186,73 @@ export function LoginPage() {
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Password</label>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium" style={{ color: '#888' }}>
+                Password
+              </label>
               <div className="relative">
                 <input
-                  className="input-field w-full pr-10"
+                  className="corp-input w-full pr-10"
                   type={showPass ? 'text' : 'password'}
                   placeholder="••••••••"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
-                  minLength={6}
+                  minLength={mode === 'register' ? 6 : undefined}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPass(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
+                  style={{ color: '#555' }}
                 >
-                  {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                  {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
             </div>
 
             {error && (
-              <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+              <div
+                className="flex items-start gap-2 rounded-lg px-3 py-2.5 text-sm"
+                style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}
+              >
                 {error}
-              </p>
+              </div>
+            )}
+
+            {success && (
+              <div
+                className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm"
+                style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', color: '#4ade80' }}
+              >
+                <CheckCircle2 size={14} />
+                {success}
+              </div>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full py-2.5 flex items-center justify-center gap-2 mt-2"
+              className="corp-btn-primary w-full py-2.5 flex items-center justify-center gap-2 mt-1"
             >
-              {loading ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                mode === 'login' ? 'Sign in' : 'Create account'
-              )}
+              {loading
+                ? <Loader2 size={15} className="animate-spin" />
+                : mode === 'login' ? 'Sign in' : 'Create account'
+              }
             </button>
           </form>
-        </div>
 
-        <p className="text-center text-xs text-slate-600 mt-6">
-          UWB Hacks 2026 · Track 2: Human Experience
-        </p>
+          {/* Demo credentials hint */}
+          <div
+            className="rounded-lg px-3 py-2.5 space-y-0.5"
+            style={{ background: '#141414', border: '1px solid #1f1f1f' }}
+          >
+            <p className="text-[11px] font-medium" style={{ color: '#555' }}>Demo credentials</p>
+            <p className="text-[11px] font-mono" style={{ color: '#444' }}>
+              demo@dory.md · demo123
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   )

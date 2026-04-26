@@ -147,10 +147,10 @@ export function UploadModal({ onClose }: UploadModalProps) {
   const allDone = queue.length > 0 && done === queue.length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-cosmos-950/80 backdrop-blur-sm animate-fade-in">
-      <div className="glass-card w-full max-w-xl border-nebula-500/20 flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" style={{ background: 'rgba(0,0,0,0.75)' }}>
+      <div className="gcard w-full max-w-xl flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-cosmos-700/50">
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid #1f1f1f' }}>
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-nebula-500/20 border border-nebula-500/40 flex items-center justify-center">
               <CloudUpload size={14} className="text-nebula-400" />
@@ -162,7 +162,7 @@ export function UploadModal({ onClose }: UploadModalProps) {
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-cosmos-800 transition-all"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-[#1c1c1c] transition-all"
           >
             <X size={15} />
           </button>
@@ -178,14 +178,14 @@ export function UploadModal({ onClose }: UploadModalProps) {
             className={cn(
               'relative flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed py-10 cursor-pointer transition-all duration-200 select-none',
               dragging
-                ? 'border-nebula-400 bg-nebula-500/10 scale-[1.01]'
-                : 'border-cosmos-600 hover:border-nebula-500/60 hover:bg-cosmos-800/30'
+                ? 'border-nebula-400 scale-[1.01]'
+                : 'border-[#252525] hover:border-[#7c3aed]/50'
             )}
           >
             <div
               className={cn(
                 'w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200',
-                dragging ? 'bg-nebula-500/30 scale-110' : 'bg-cosmos-700/60'
+                dragging ? 'bg-[#7c3aed]/20 scale-110' : 'bg-[#1c1c1c]'
               )}
             >
               <Upload size={20} className={dragging ? 'text-nebula-300' : 'text-slate-400'} />
@@ -202,7 +202,7 @@ export function UploadModal({ onClose }: UploadModalProps) {
               {ACCEPTED.map((ext) => (
                 <span
                   key={ext}
-                  className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cosmos-700/60 text-slate-500 border border-cosmos-600/50"
+                  className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#1c1c1c] text-slate-500 border border-[#252525]"
                 >
                   {ext}
                 </span>
@@ -244,10 +244,10 @@ export function UploadModal({ onClose }: UploadModalProps) {
                     item.status === 'done' && 'border-green-500/20 bg-green-500/5',
                     item.status === 'error' && 'border-red-500/20 bg-red-500/5',
                     item.status === 'processing' && 'border-nebula-500/20 bg-nebula-500/5',
-                    item.status === 'pending' && 'border-cosmos-700 bg-cosmos-800/30'
+                    item.status === 'pending' && 'border-[#252525] bg-[#141414]'
                   )}
                 >
-                  <div className="w-8 h-8 rounded-lg bg-cosmos-700/50 flex items-center justify-center shrink-0">
+                  <div className="w-8 h-8 rounded-lg bg-[#1c1c1c] flex items-center justify-center shrink-0">
                     {item.status === 'processing' ? (
                       <Loader2 size={14} className="text-nebula-400 animate-spin" />
                     ) : item.status === 'done' ? (
@@ -287,7 +287,7 @@ export function UploadModal({ onClose }: UploadModalProps) {
         )}
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-cosmos-700/50 flex items-center justify-between gap-3 mt-2">
+        <div className="px-6 py-4 flex items-center justify-between gap-3 mt-2" style={{ borderTop: '1px solid #1f1f1f' }}>
           <p className="text-[11px] text-slate-600">
             {allDone
               ? `${done} file${done !== 1 ? 's' : ''} added to your knowledge base`

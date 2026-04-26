@@ -21,8 +21,24 @@ const AuthContext = createContext<AuthCtx>({
 
 interface StoredUser { name: string; email: string; password: string }
 
+const SEED_USERS: StoredUser[] = [
+  { name: 'Demo User', email: 'demo@dory.md', password: 'demo123' },
+]
+
+function initUsers(): void {
+  try {
+    const stored = JSON.parse(localStorage.getItem('dory-users') ?? '[]') as StoredUser[]
+    const seedEmails = new Set(SEED_USERS.map(s => s.email))
+    const userCreated = stored.filter(u => !seedEmails.has(u.email))
+    localStorage.setItem('dory-users', JSON.stringify([...SEED_USERS, ...userCreated]))
+  } catch {
+    localStorage.setItem('dory-users', JSON.stringify(SEED_USERS))
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
+    initUsers()
     try {
       return JSON.parse(localStorage.getItem('dory-session') ?? 'null')
     } catch {
@@ -45,9 +61,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (users.some(u => u.email === email)) return false
     users.push({ name, email, password })
     localStorage.setItem('dory-users', JSON.stringify(users))
-    const session = { email, name }
-    setUser(session)
-    localStorage.setItem('dory-session', JSON.stringify(session))
     return true
   }
 
