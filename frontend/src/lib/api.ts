@@ -236,6 +236,30 @@ export async function getFolders(): Promise<string[]> {
   return r.folders;
 }
 
+export async function aiSummarize(content: string): Promise<string> {
+  const r = await apiFetch<{ summary: string }>('/api/ai/summarize', {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  });
+  return r.summary;
+}
+
+export async function aiExpand(content: string): Promise<string> {
+  const r = await apiFetch<{ expanded: string }>('/api/ai/expand', {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  });
+  return r.expanded;
+}
+
+export async function aiOptimize(original: string, expanded: string): Promise<string> {
+  const r = await apiFetch<{ optimized: string }>('/api/ai/optimize', {
+    method: 'POST',
+    body: JSON.stringify({ original, expanded }),
+  });
+  return r.optimized;
+}
+
 export async function createNotionPage(params: {
   title: string;
   content: string;

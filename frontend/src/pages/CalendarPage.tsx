@@ -87,8 +87,20 @@ export function CalendarPage() {
 
   const selectedChunks = selected ? (forgetMap[selected] ?? []) : [];
 
+  // Upcoming forgetting events (next 30 days)
+  const upcoming = chunks
+    .map(c => ({ chunk: c, fd: predictForgetDate(c) }))
+    .filter(({ fd }) => {
+      const days = Math.floor((fd.getTime() - now.getTime()) / 86_400_000);
+      return days >= 0 && days <= 30;
+    })
+    .sort((a, b) => a.fd.getTime() - b.fd.getTime())
+    .slice(0, 20);
+
   return (
-    <div className="max-w-3xl space-y-5 animate-fade-in">
+    <div className="flex gap-5 animate-fade-in">
+      {/* ── LEFT COLUMN ─────────────────────────────────────────────────── */}
+      <div className="flex-1 min-w-0 space-y-5">
       <div>
         <h1 className="text-2xl font-black text-white tracking-tight">Forget Calendar</h1>
         <p className="text-sm text-slate-500 mt-0.5">
@@ -305,7 +317,7 @@ export function CalendarPage() {
       )}
 
       {/* Summary stats */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-3 mt-5">
         {[
           {
             label: 'Forgetting this month',
@@ -334,6 +346,55 @@ export function CalendarPage() {
             <p className="text-[10px] text-slate-600 mt-0.5">{label}</p>
           </Card3D>
         ))}
+      </div>
+      </div>{/* end left column */}
+
+      {/* ── RIGHT SIDEBAR ─────────────────────────────────────────────────── */}
+      <div className="w-64 shrink-0 space-y-3 pt-0">
+        <div>
+          <h2 className="text-xl font-black text-white tracking-tight">Upcoming</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Forgetting in the next 30 days</p>
+        </div>
+
+        {loading ? (
+          <div className="gcard p-6 flex items-center justify-center">
+            <BookOpen size={16} className="text-slate-700 animate-pulse" />
+          </div>
+        ) : upcoming.length === 0 ? (
+          <div className="gcard p-6 text-center">
+            <p className="text-xs text-slate-600">No concepts forgetting soon 🎉</p>
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
+            {upcoming.map(({ chunk: c, fd }) => {
+              const daysUntil = Math.floor((fd.getTime() - now.getTime()) / 86_400_000);
+              const uc = urgencyColor(daysUntil);
+              return (
+                <button
+                  key={c.chunk_id}
+                  onClick={() => setOpenChunk(c)}
+                  className="w-full text-left p-3 rounded-xl transition-all hover:scale-[1.01]"
+                  style={{ background: `${uc}08`, border: `1px solid ${uc}25` }}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-mono" style={{ color: uc }}>
+                      {daysUntil === 0 ? 'today' : daysUntil === 1 ? 'tomorrow' : `${daysUntil}d`}
+                    </span>
+                    <span className="text-[9px] text-slate-700 font-mono">
+                      {Math.round(c.retention * 100)}%
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
+                    {c.content.slice(0, 80)}…
+                  </p>
+                  <p className="text-[9px] text-slate-700 mt-1 font-mono">
+                    {c.source_file.split(/[\\/]/).pop()}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

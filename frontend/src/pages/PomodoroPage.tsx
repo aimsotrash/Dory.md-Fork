@@ -14,17 +14,25 @@ const STROKE = 10;
 const R = (SIZE - STROKE) / 2;
 const C = 2 * Math.PI * R;
 
-const STORAGE_KEY = 'dory_pomodoro_v1';
+const SESSION_KEY = 'dory_pomodoro_v1';
+const TIMER_KEY   = 'dory_pomodoro_timer';
 
 interface StoredSession {
   mode: Mode;
-  at: string;   // ISO timestamp
-  date: string; // YYYY-MM-DD
+  at: string;
+  date: string;
 }
 
 interface PomodoroStore {
   sessions: StoredSession[];
   totalCycles: number;
+}
+
+// Persisted timer state — survives navigation and page refresh
+interface TimerState {
+  mode: Mode;
+  pausedRemaining: number; // seconds remaining when last paused/saved
+  startedAt: number | null; // epoch ms when timer was last started; null = paused
 }
 
 function todayKey() {
@@ -33,26 +41,36 @@ function todayKey() {
 }
 
 function loadStore(): PomodoroStore {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as PomodoroStore;
-  } catch { /* ignore */ }
-  return { sessions: [], totalCycles: 0 };
+  try { return JSON.parse(localStorage.getItem(SESSION_KEY) ?? 'null') ?? { sessions: [], totalCycles: 0 }; }
+  catch { return { sessions: [], totalCycles: 0 }; }
 }
 
-function saveStore(store: PomodoroStore) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+function saveStore(s: PomodoroStore) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(s));
+}
+
+function loadTimerState(): TimerState {
+  try { return JSON.parse(localStorage.getItem(TIMER_KEY) ?? 'null') ?? { mode: 'work', pausedRemaining: DURATIONS.work, startedAt: null }; }
+  catch { return { mode: 'work', pausedRemaining: DURATIONS.work, startedAt: null }; }
+}
+
+function saveTimerState(s: TimerState) {
+  localStorage.setItem(TIMER_KEY, JSON.stringify(s));
+}
+
+function computeRemaining(ts: TimerState): number {
+  if (ts.startedAt === null) return ts.pausedRemaining;
+  const elapsed = Math.floor((Date.now() - ts.startedAt) / 1000);
+  return Math.max(0, ts.pausedRemaining - elapsed);
 }
 
 function fmt(s: number) {
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
-
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-// Returns array of last N days (YYYY-MM-DD), most recent last
 function lastNDays(n: number): string[] {
   const days: string[] = [];
   for (let i = n - 1; i >= 0; i--) {
@@ -64,11 +82,19 @@ function lastNDays(n: number): string[] {
 }
 
 export function PomodoroPage() {
-  const [mode, setMode]           = useState<Mode>('work');
-  const [remaining, setRemaining] = useState(DURATIONS.work);
-  const [running, setRunning]     = useState(false);
-  const [store, setStore]         = useState<PomodoroStore>(loadStore);
+  // Restore from localStorage on mount
+  const [timerState, setTimerStateRaw] = useState<TimerState>(loadTimerState);
+  const [remaining, setRemaining] = useState(() => computeRemaining(loadTimerState()));
+  const [store, setStore] = useState<PomodoroStore>(loadStore);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const mode    = timerState.mode;
+  const running = timerState.startedAt !== null;
+
+  function setTimerState(next: TimerState) {
+    setTimerStateRaw(next);
+    saveTimerState(next);
+  }
 
   const total    = DURATIONS[mode];
   const progress = (total - remaining) / total;
@@ -85,59 +111,118 @@ export function PomodoroPage() {
   const allFocusHours   = Math.floor((allWorkSessions * WORK_MIN) / 60);
   const allFocusMinRem  = (allWorkSessions * WORK_MIN) % 60;
 
-  // Weekly bar chart data (work sessions per day for last 7 days)
-  const weekDays  = lastNDays(7);
+  const weekDays   = lastNDays(7);
   const weekCounts = weekDays.map(d => store.sessions.filter(s => s.date === d && s.mode === 'work').length);
-  const weekMax   = Math.max(...weekCounts, 1);
+  const weekMax    = Math.max(...weekCounts, 1);
 
   const finish = useCallback(() => {
-    setRunning(false);
-    const entry: StoredSession = {
-      mode,
-      at: new Date().toISOString(),
-      date: todayKey(),
-    };
+    const finishedMode = mode;
+    const entry: StoredSession = { mode: finishedMode, at: new Date().toISOString(), date: todayKey() };
+
     setStore(prev => {
       const next: PomodoroStore = {
         sessions: [...prev.sessions, entry],
-        totalCycles: mode === 'work' ? prev.totalCycles + 1 : prev.totalCycles,
+        totalCycles: finishedMode === 'work' ? prev.totalCycles + 1 : prev.totalCycles,
       };
       saveStore(next);
+      // Auto-advance mode
+      const nextMode: Mode = finishedMode === 'work'
+        ? (next.totalCycles % 4 === 0 && next.totalCycles > 0 ? 'long' : 'short')
+        : 'work';
+      const nextRemaining = DURATIONS[nextMode];
+      const nextTimer: TimerState = { mode: nextMode, pausedRemaining: nextRemaining, startedAt: null };
+      setTimerState(nextTimer);
+      setRemaining(nextRemaining);
       return next;
     });
-    if (mode === 'work') {
-      setStore(prev => {
-        const nextCycles = prev.totalCycles; // already incremented above
-        const isLong = nextCycles % 4 === 0 && nextCycles > 0;
-        const nextMode: Mode = isLong ? 'long' : 'short';
-        setMode(nextMode);
-        setRemaining(DURATIONS[nextMode]);
-        return prev;
+
+    // Request notification permission and show notification
+    if ('Notification' in window) {
+      Notification.requestPermission().then(perm => {
+        if (perm === 'granted') {
+          new Notification('Dory.md — Pomodoro', {
+            body: finishedMode === 'work' ? '25min focus session complete! Time for a break.' : 'Break over. Back to focus!',
+            icon: '/favicon.ico',
+          });
+        }
       });
-    } else {
-      setMode('work');
-      setRemaining(DURATIONS.work);
     }
   }, [mode]);
 
+  // Tick interval — only runs when on this page AND running
   useEffect(() => {
-    if (running) {
-      intervalRef.current = setInterval(() => {
-        setRemaining(r => {
-          if (r <= 1) { clearInterval(intervalRef.current!); finish(); return 0; }
-          return r - 1;
-        });
-      }, 1000);
-    } else {
+    if (!running) {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      return;
     }
+    intervalRef.current = setInterval(() => {
+      setRemaining(r => {
+        if (r <= 1) {
+          clearInterval(intervalRef.current!);
+          finish();
+          return 0;
+        }
+        return r - 1;
+      });
+    }, 1000);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [running, finish]);
 
-  function switchMode(m: Mode) { setMode(m); setRemaining(DURATIONS[m]); setRunning(false); }
-  function reset() { setRemaining(DURATIONS[mode]); setRunning(false); }
+  // On mount: recalculate remaining if timer was running when we navigated away
+  useEffect(() => {
+    const ts = loadTimerState();
+    if (ts.startedAt !== null) {
+      const r = computeRemaining(ts);
+      if (r <= 0) {
+        // Timer finished while away
+        finish();
+      } else {
+        setRemaining(r);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Day abbreviations for weekly chart
+  // Recalculate on tab visibility change (comes back to tab)
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === 'visible') {
+        const ts = loadTimerState();
+        if (ts.startedAt !== null) {
+          const r = computeRemaining(ts);
+          setRemaining(r <= 0 ? 0 : r);
+          if (r <= 0) finish();
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [finish]);
+
+  function startTimer() {
+    const next: TimerState = { mode, pausedRemaining: remaining, startedAt: Date.now() };
+    setTimerState(next);
+  }
+
+  function pauseTimer() {
+    const next: TimerState = { mode, pausedRemaining: remaining, startedAt: null };
+    setTimerState(next);
+  }
+
+  function reset() {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    const next: TimerState = { mode, pausedRemaining: DURATIONS[mode], startedAt: null };
+    setTimerState(next);
+    setRemaining(DURATIONS[mode]);
+  }
+
+  function switchMode(m: Mode) {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    const next: TimerState = { mode: m, pausedRemaining: DURATIONS[m], startedAt: null };
+    setTimerState(next);
+    setRemaining(DURATIONS[m]);
+  }
+
   const dayLabels = weekDays.map(d => {
     const dt = new Date(d + 'T12:00:00');
     return dt.toLocaleDateString([], { weekday: 'short' }).slice(0, 2);
@@ -152,7 +237,7 @@ export function PomodoroPage() {
         </div>
         <div>
           <h1 className="text-xl font-black text-white tracking-tight">Pomodoro Timer</h1>
-          <p className="text-xs text-slate-600">Deep work cycles — stay in the zone</p>
+          <p className="text-xs text-slate-600">Deep work cycles — timer runs across pages</p>
         </div>
         {todayWorkMin > 0 && (
           <div className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-full"
@@ -163,20 +248,26 @@ export function PomodoroPage() {
         )}
       </div>
 
+      {/* Running indicator banner */}
+      {running && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono"
+          style={{ background: `${color}12`, border: `1px solid ${color}30`, color }}>
+          <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: color }} />
+          Timer running — switch tabs freely, it will track the time
+        </div>
+      )}
+
       {/* Mode selector */}
       <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
         {(['work', 'short', 'long'] as Mode[]).map(m => (
-          <button
-            key={m}
-            onClick={() => switchMode(m)}
+          <button key={m} onClick={() => switchMode(m)}
             className="flex-1 py-2.5 text-xs font-semibold tracking-wide transition-all duration-300"
             style={{
               background: mode === m ? `${COLORS[m]}22` : 'rgba(255,255,255,0.02)',
               color: mode === m ? COLORS[m] : '#475569',
               borderRight: m !== 'long' ? '1px solid rgba(255,255,255,0.06)' : 'none',
               boxShadow: mode === m ? `inset 0 -2px 0 ${COLORS[m]}` : 'none',
-            }}
-          >
+            }}>
             {LABELS[m]}
           </button>
         ))}
@@ -186,14 +277,11 @@ export function PomodoroPage() {
       <Card3D className="p-8 flex flex-col items-center" intensity={5}>
         <div className="relative" style={{ width: SIZE, height: SIZE }}>
           <svg width={SIZE} height={SIZE} className="-rotate-90" style={{ overflow: 'visible' }}>
-            <circle cx={SIZE/2} cy={SIZE/2} r={R}
-              fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={STROKE} />
-            <circle cx={SIZE/2} cy={SIZE/2} r={R}
-              fill="none" stroke={color} strokeWidth={STROKE + 4}
+            <circle cx={SIZE/2} cy={SIZE/2} r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={STROKE} />
+            <circle cx={SIZE/2} cy={SIZE/2} r={R} fill="none" stroke={color} strokeWidth={STROKE + 4}
               strokeDasharray={C} strokeDashoffset={dash} strokeLinecap="round"
               style={{ opacity: 0.15, transition: 'stroke-dashoffset 1s linear, stroke 0.4s ease', filter: `blur(6px)` }} />
-            <circle cx={SIZE/2} cy={SIZE/2} r={R}
-              fill="none" stroke={color} strokeWidth={STROKE}
+            <circle cx={SIZE/2} cy={SIZE/2} r={R} fill="none" stroke={color} strokeWidth={STROKE}
               strokeDasharray={C} strokeDashoffset={dash} strokeLinecap="round"
               style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.4s ease', filter: `drop-shadow(0 0 8px ${color})` }} />
           </svg>
@@ -212,14 +300,13 @@ export function PomodoroPage() {
           </div>
         </div>
 
-        {/* Controls */}
         <div className="flex items-center gap-3 mt-6">
           <button onClick={reset}
             className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-300 transition-all"
             style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <RotateCcw size={14} />
           </button>
-          <button onClick={() => setRunning(r => !r)}
+          <button onClick={running ? pauseTimer : startTimer}
             className="px-10 py-3 rounded-xl text-sm font-bold text-white transition-all duration-200 hover:scale-105"
             style={{ background: `linear-gradient(135deg, ${color}, ${color}bb)`, boxShadow: `0 0 24px ${glow}, inset 0 1px 0 rgba(255,255,255,0.15)` }}>
             {running ? '⏸ Pause' : '▶ Start'}
@@ -266,7 +353,6 @@ export function PomodoroPage() {
           </div>
         </div>
 
-        {/* 7-day bar chart */}
         <div>
           <p className="text-[10px] font-mono text-slate-600 uppercase tracking-widest mb-2">This week — work sessions</p>
           <div className="flex items-end gap-1.5 h-14">
@@ -278,14 +364,10 @@ export function PomodoroPage() {
                   <div className="w-full rounded-t-sm transition-all duration-500 relative group"
                     style={{
                       height: barH,
-                      background: isToday
-                        ? 'linear-gradient(180deg, #7c3aed, #0891b2)'
-                        : count > 0 ? 'rgba(124,58,237,0.35)' : 'rgba(255,255,255,0.04)',
+                      background: isToday ? 'linear-gradient(180deg, #7c3aed, #0891b2)' : count > 0 ? 'rgba(124,58,237,0.35)' : 'rgba(255,255,255,0.04)',
                       boxShadow: isToday ? '0 0 8px rgba(124,58,237,0.5)' : 'none',
                     }}>
-                    {count > 0 && (
-                      <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] font-mono text-slate-500">{count}</span>
-                    )}
+                    {count > 0 && <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] font-mono text-slate-500">{count}</span>}
                   </div>
                   <span className="text-[9px] font-mono" style={{ color: isToday ? '#a78bfa' : '#475569' }}>{dayLabels[i]}</span>
                 </div>
@@ -295,7 +377,6 @@ export function PomodoroPage() {
         </div>
       </Card3D>
 
-      {/* Session log (persisted, last 15) */}
       {store.sessions.length > 0 && (
         <div className="gcard p-4">
           <p className="text-[10px] font-mono text-slate-600 uppercase tracking-widest mb-3">Recent sessions</p>
@@ -313,12 +394,11 @@ export function PomodoroPage() {
         </div>
       )}
 
-      {/* Tip */}
       <div className="rounded-xl px-4 py-3 text-xs text-slate-500 leading-relaxed"
         style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
         <span className="text-nebula-400 font-semibold">Pomodoro technique — </span>
         25 min focus → 5 min break → repeat 4× → 15 min long break.
-        Use breaks to review fading memories in your Dory library.
+        Timer state is saved — switch tabs or take notes freely.
       </div>
     </div>
   );
