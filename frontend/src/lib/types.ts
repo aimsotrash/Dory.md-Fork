@@ -16,6 +16,7 @@ export interface Chunk {
   complexity_k: number;
   retention?: number;
   tags?: string[];
+  folder?: string;
 }
 
 export interface CategoryStat {
@@ -132,6 +133,14 @@ export interface BackendChunk {
   last_accessed: string;      // human-readable "5mo ago"
   last_accessed_iso: string;  // ISO 8601 for date math
   access_count: number;
+  folder?: string | null;
+}
+
+export interface ChunkDetail {
+  chunk_id: string;
+  content: string;
+  source_file: string;
+  folder?: string | null;
 }
 
 export interface FadingResponse {

@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS chunks (
     complexity_score REAL DEFAULT 0.5,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     last_accessed DATETIME DEFAULT CURRENT_TIMESTAMP,
-    access_count INTEGER DEFAULT 0
+    access_count INTEGER DEFAULT 0,
+    folder TEXT DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS access_log (

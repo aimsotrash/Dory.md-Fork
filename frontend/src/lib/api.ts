@@ -1,6 +1,7 @@
 import { config } from './config';
 import type {
   Chunk,
+  ChunkDetail,
   HealthResponse,
   DiscoveryResponse,
   SearchResponse,
@@ -199,6 +200,40 @@ export async function importNotionPages(pageIds: string[]): Promise<NotionImport
     method: 'POST',
     body: JSON.stringify({ page_ids: pageIds }),
   });
+}
+
+export async function getChunkDetail(chunkId: string): Promise<ChunkDetail> {
+  return apiFetch<ChunkDetail>(`/api/chunks/${chunkId}`);
+}
+
+export async function updateChunk(chunkId: string, content: string): Promise<void> {
+  await apiFetch(`/api/chunks/${chunkId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ content }),
+  });
+}
+
+export async function deleteChunk(chunkId: string): Promise<void> {
+  await apiFetch(`/api/chunks/${chunkId}`, { method: 'DELETE' });
+}
+
+export async function bulkDeleteChunks(chunkIds: string[]): Promise<void> {
+  await apiFetch('/api/chunks/bulk-delete', {
+    method: 'POST',
+    body: JSON.stringify({ chunk_ids: chunkIds }),
+  });
+}
+
+export async function moveChunkToFolder(chunkId: string, folder: string | null): Promise<void> {
+  await apiFetch(`/api/chunks/${chunkId}/folder`, {
+    method: 'PATCH',
+    body: JSON.stringify({ folder }),
+  });
+}
+
+export async function getFolders(): Promise<string[]> {
+  const r = await apiFetch<{ folders: string[] }>('/api/folders');
+  return r.folders;
 }
 
 export async function createNotionPage(params: {

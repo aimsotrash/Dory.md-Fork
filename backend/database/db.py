@@ -20,9 +20,17 @@ def _connect() -> sqlite3.Connection:
     return conn
 
 
+def _migrate(conn: sqlite3.Connection) -> None:
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(chunks)").fetchall()}
+    if "folder" not in cols:
+        conn.execute("ALTER TABLE chunks ADD COLUMN folder TEXT DEFAULT NULL")
+        conn.commit()
+
+
 def init_db() -> None:
     conn = _connect()
     conn.executescript(SCHEMA_PATH.read_text())
+    _migrate(conn)
     # Ensure the default user exists for single-user hackathon mode
     conn.execute(
         "INSERT OR IGNORE INTO users (id, email) VALUES (?, ?)",
@@ -150,6 +158,37 @@ def delete_chunk(chunk_id: str) -> None:
     conn.execute("DELETE FROM chunks WHERE id = ?", (chunk_id,))
     conn.commit()
     conn.close()
+
+
+def update_chunk_content(chunk_id: str, content: str) -> None:
+    conn = _connect()
+    conn.execute("UPDATE chunks SET content = ? WHERE id = ?", (content, chunk_id))
+    conn.commit()
+    conn.close()
+
+
+def set_chunk_folder(chunk_id: str, folder: Optional[str]) -> None:
+    conn = _connect()
+    conn.execute("UPDATE chunks SET folder = ? WHERE id = ?", (folder, chunk_id))
+    conn.commit()
+    conn.close()
+
+
+def get_folders(user_id: str = DEFAULT_USER_ID) -> list[str]:
+    conn = _connect()
+    rows = conn.execute(
+        "SELECT DISTINCT folder FROM chunks WHERE user_id = ? AND folder IS NOT NULL AND folder != '' ORDER BY folder",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+    return [row["folder"] for row in rows]
+
+
+def get_chunk_full(chunk_id: str) -> Optional[sqlite3.Row]:
+    conn = _connect()
+    row = conn.execute("SELECT * FROM chunks WHERE id = ?", (chunk_id,)).fetchone()
+    conn.close()
+    return row
 
 
 def count_chunks(user_id: str = DEFAULT_USER_ID) -> int:

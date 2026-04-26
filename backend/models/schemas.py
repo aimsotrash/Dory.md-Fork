@@ -24,6 +24,26 @@ class ChunkOut(BaseModel):
     last_accessed: str          # human-readable, e.g. "5mo ago"
     last_accessed_iso: str      # ISO 8601 for client-side date math
     access_count: int
+    folder: Optional[str] = None
+
+
+class ChunkDetailOut(BaseModel):
+    chunk_id: str
+    content: str
+    source_file: str
+    folder: Optional[str] = None
+
+
+class UpdateChunkRequest(BaseModel):
+    content: str
+
+
+class BulkDeleteRequest(BaseModel):
+    chunk_ids: list[str]
+
+
+class FolderRequest(BaseModel):
+    folder: Optional[str] = None
 
 
 class FadingResponse(BaseModel):
