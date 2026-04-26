@@ -25,9 +25,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Dory.md API", version="1.0.0", lifespan=lifespan)
 
+_CORS_REGEX = os.getenv(
+    "CORS_ORIGIN_REGEX",
+    r"https?://(localhost|127\.0\.0\.1|\d+\.\d+\.\d+\.\d+)(:\d+)?|https://[\w-]+\.vercel\.app",
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|\d+\.\d+\.\d+\.\d+)(:\d+)?",
+    allow_origin_regex=_CORS_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
