@@ -11,12 +11,14 @@ load_dotenv(Path(__file__).parent / ".env")
 
 from core.embeddings import warm_model
 from database.db import init_db
-from routers import ai, chunks, discovery, fading, health, ingest, notion, quiz, review, search, stats
+from routers import ai, auth, chunks, discovery, fading, health, ingest, notion, quiz, review, search, stats
+from routers.auth import setup_demo_user
 from services.category_service import classify_all_uncategorized
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    setup_demo_user()
     warm_model()
     threading.Thread(target=classify_all_uncategorized, daemon=True).start()
     yield
@@ -31,6 +33,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router, prefix="/api")
 app.include_router(ai.router, prefix="/api")
 app.include_router(ingest.router, prefix="/api")
 app.include_router(fading.router, prefix="/api")

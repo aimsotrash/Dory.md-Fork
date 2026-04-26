@@ -16,3 +16,4 @@ python-multipart
 python-jose[cryptography]
 authlib
 python-dotenv
+bcrypt

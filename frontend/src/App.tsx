@@ -9,7 +9,6 @@ import { SettingsPage } from '@/pages/SettingsPage';
 import { CalendarPage } from '@/pages/CalendarPage';
 import { NoteEditorPage } from '@/pages/NoteEditorPage';
 import { PomodoroPage } from '@/pages/PomodoroPage';
-import { NotionPage } from '@/pages/NotionPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { ThemeProvider } from '@/contexts/ThemeContext';
@@ -47,7 +46,7 @@ function AnimatedRoutes() {
                     <Route path="/calendar" element={<CalendarPage />} />
                     <Route path="/notes"    element={<NoteEditorPage />} />
                     <Route path="/pomodoro" element={<PomodoroPage />} />
-                    <Route path="/notion"   element={<NotionPage />} />
+                    <Route path="/notion"   element={<Navigate to="/settings" replace />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="*" element={
                       <div className="gcard p-10 text-center">

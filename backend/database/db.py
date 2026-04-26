@@ -21,20 +21,26 @@ def _connect() -> sqlite3.Connection:
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
-    cols = {row[1] for row in conn.execute("PRAGMA table_info(chunks)").fetchall()}
-    if "folder" not in cols:
+    chunk_cols = {row[1] for row in conn.execute("PRAGMA table_info(chunks)").fetchall()}
+    if "folder" not in chunk_cols:
         conn.execute("ALTER TABLE chunks ADD COLUMN folder TEXT DEFAULT NULL")
-        conn.commit()
+
+    user_cols = {row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "name" not in user_cols:
+        conn.execute("ALTER TABLE users ADD COLUMN name TEXT")
+    if "password_hash" not in user_cols:
+        conn.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
+    conn.commit()
 
 
 def init_db() -> None:
     conn = _connect()
     conn.executescript(SCHEMA_PATH.read_text())
     _migrate(conn)
-    # Ensure the default user exists for single-user hackathon mode
+    # Ensure the default demo user exists
     conn.execute(
-        "INSERT OR IGNORE INTO users (id, email) VALUES (?, ?)",
-        (DEFAULT_USER_ID, "demo@dory.md"),
+        "INSERT OR IGNORE INTO users (id, email, name) VALUES (?, ?, ?)",
+        (DEFAULT_USER_ID, "demo@dory.md", "Demo User"),
     )
     conn.commit()
     conn.close()
@@ -42,6 +48,36 @@ def init_db() -> None:
 
 def get_connection() -> sqlite3.Connection:
     return _connect()
+
+
+# ---------------------------------------------------------------------------
+# User / auth helpers
+# ---------------------------------------------------------------------------
+
+def get_user_by_email(email: str) -> Optional[sqlite3.Row]:
+    conn = _connect()
+    row = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    conn.close()
+    return row
+
+
+def create_user(email: str, name: str, password_hash: str) -> str:
+    user_id = str(uuid.uuid4())
+    conn = _connect()
+    conn.execute(
+        "INSERT INTO users (id, email, name, password_hash) VALUES (?, ?, ?, ?)",
+        (user_id, email, name, password_hash),
+    )
+    conn.commit()
+    conn.close()
+    return user_id
+
+
+def set_user_password_hash(user_id: str, password_hash: str) -> None:
+    conn = _connect()
+    conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
+    conn.commit()
+    conn.close()
 
 
 # ---------------------------------------------------------------------------

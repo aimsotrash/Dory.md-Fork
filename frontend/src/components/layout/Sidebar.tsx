@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Search, BrainCircuit, BookOpen,
   CalendarDays, NotebookPen, Timer, Settings,
-  FileText, LogOut,
+  LogOut,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -27,7 +27,6 @@ const navGroups = [
       { to: '/notes',    label: 'Note Editor', icon: NotebookPen },
       { to: '/pomodoro', label: 'Pomodoro',    icon: Timer },
       { to: '/calendar', label: 'Calendar',    icon: CalendarDays },
-      { to: '/notion',   label: 'Notion',      icon: FileText },
     ],
   },
 ];

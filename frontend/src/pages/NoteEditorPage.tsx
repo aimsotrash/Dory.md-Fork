@@ -424,7 +424,7 @@ export function NoteEditorPage() {
                   </select>
                 )}
                 {saveMode === 'notion' && !notionConnected && (
-                  <Link to="/notion" className="text-xs text-nebula-400 hover:text-nebula-300 flex items-center gap-0.5">
+                  <Link to="/settings" className="text-xs text-nebula-400 hover:text-nebula-300 flex items-center gap-0.5">
                     Connect <ChevronRight size={10} />
                   </Link>
                 )}
