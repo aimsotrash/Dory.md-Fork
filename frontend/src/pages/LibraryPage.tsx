@@ -3,8 +3,9 @@ import { ChunkCard } from '@/components/chunks/ChunkCard';
 import { getAllChunks } from '@/lib/api';
 import type { BackendChunk, Category } from '@/lib/types';
 import type { Chunk } from '@/lib/types';
-import { categoryColors } from '@/styles/theme';
-import { BookOpen, SlidersHorizontal, Loader2 } from 'lucide-react';
+import { categoryColors, retentionToColor, retentionToLabel } from '@/styles/theme';
+import { BookOpen, SlidersHorizontal, Loader2, X, Brain, Clock, TrendingDown } from 'lucide-react';
+import { formatRetentionPct } from '@/lib/utils';
 
 const ALL_CATEGORIES: Category[] = ['technical', 'personal', 'reference', 'general'];
 
@@ -42,6 +43,7 @@ export function LibraryPage() {
   const [sortBy, setSortBy] = useState<'retention' | 'recent' | 'access'>('retention');
   const [allChunks, setAllChunks] = useState<Chunk[]>([]);
   const [loading, setLoading] = useState(true);
+  const [openChunk, setOpenChunk] = useState<Chunk | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -130,10 +132,74 @@ export function LibraryPage() {
       ) : (
         <div className="space-y-3">
           {chunks.map((chunk) => (
-            <ChunkCard key={chunk.id} chunk={chunk} />
+            <ChunkCard key={chunk.id} chunk={chunk} onClick={() => setOpenChunk(chunk)} />
           ))}
         </div>
       )}
+
+      {/* Chunk detail modal */}
+      {openChunk && (() => {
+        const retention = openChunk.retention ?? 0.5;
+        const color = retentionToColor(retention);
+        const label = retentionToLabel(retention);
+        const catColor = categoryColors[openChunk.category] ?? '#64748b';
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
+            onClick={() => setOpenChunk(null)}
+          >
+            <div
+              className="w-full max-w-2xl rounded-2xl p-6 space-y-4 max-h-[80vh] flex flex-col"
+              style={{
+                background: 'linear-gradient(135deg, rgba(15,10,30,0.98) 0%, rgba(5,8,16,0.99) 100%)',
+                border: '1px solid rgba(124,58,237,0.3)',
+                boxShadow: '0 40px 80px rgba(0,0,0,0.7)',
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Brain size={14} className="text-nebula-400" />
+                  <span className="text-xs font-mono text-slate-400">{openChunk.source_name}</span>
+                  <span
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize"
+                    style={{ color: catColor, background: `${catColor}15`, border: `1px solid ${catColor}30` }}
+                  >
+                    {openChunk.category}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span
+                    className="text-xs font-mono px-2 py-0.5 rounded-full"
+                    style={{ color, background: `${color}12`, border: `1px solid ${color}40` }}
+                  >
+                    {formatRetentionPct(retention)} · {label}
+                  </span>
+                  <button onClick={() => setOpenChunk(null)} className="text-slate-600 hover:text-white transition-colors">
+                    <X size={15} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div
+                className="rounded-xl p-4 text-sm text-slate-200 leading-relaxed overflow-y-auto flex-1 whitespace-pre-wrap"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+              >
+                {openChunk.content}
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center gap-5 text-[11px] font-mono text-slate-600 shrink-0 flex-wrap">
+                <span className="flex items-center gap-1"><Clock size={10} /> {openChunk.last_accessed}</span>
+                <span className="flex items-center gap-1"><TrendingDown size={10} /> {openChunk.access_count}× reviewed</span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { marked } from 'marked'
-import { ingestText, notionStatus, listNotionPages, createNotionPage } from '@/lib/api'
+import { ingestText, notionStatus, listNotionPages, createNotionPage, getAllChunks } from '@/lib/api'
 import { useNotes } from '@/hooks/useNotes'
-import type { NotionPage } from '@/lib/types'
+import type { NotionPage, BackendChunk } from '@/lib/types'
+import { retentionToColor } from '@/styles/theme'
 import {
   Plus, Trash2, Search, FileText, Eye, Edit3,
-  Download, Upload, ChevronRight, Clock,
+  Download, Upload, ChevronRight, Clock, Library, X,
 } from 'lucide-react'
 
 const SLASH_COMMANDS = [
@@ -48,6 +49,10 @@ export function NoteEditorPage() {
   const [notionPages, setNotionPages] = useState<NotionPage[]>([])
   const [selectedParentId, setSelectedParentId] = useState('')
 
+  const [sidebarTab, setSidebarTab] = useState<'notes' | 'library'>('notes')
+  const [importedChunks, setImportedChunks] = useState<BackendChunk[]>([])
+  const [viewChunk, setViewChunk] = useState<BackendChunk | null>(null)
+
   const editorRef = useRef<HTMLTextAreaElement>(null)
   const titleRef = useRef<HTMLInputElement>(null)
   const active = notes.find(n => n.id === activeId) ?? null
@@ -55,6 +60,12 @@ export function NoteEditorPage() {
   useEffect(() => {
     if (!activeId && notes.length > 0) setActiveId(notes[0].id)
   }, [notes.length])
+
+  useEffect(() => {
+    if (sidebarTab === 'library' && importedChunks.length === 0) {
+      getAllChunks().then(r => setImportedChunks(r.chunks)).catch(() => {})
+    }
+  }, [sidebarTab])
 
   useEffect(() => {
     if (saveMode === 'notion' && !notionConnected) {
@@ -194,15 +205,30 @@ export function NoteEditorPage() {
       >
         <div className="p-3 space-y-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono font-semibold text-slate-500 uppercase tracking-widest">Notes</span>
-            <button
-              onClick={handleNewNote}
-              title="New note"
-              className="w-5 h-5 rounded-md flex items-center justify-center text-slate-500 hover:text-white transition-colors"
-              style={{ background: 'rgba(255,255,255,0.06)' }}
-            >
-              <Plus size={12} />
-            </button>
+            <div className="flex rounded-md overflow-hidden text-[10px] font-mono font-semibold" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+              <button
+                onClick={() => setSidebarTab('notes')}
+                className={`flex items-center gap-1 px-2.5 py-1 transition-all ${sidebarTab === 'notes' ? 'bg-nebula-500/20 text-nebula-300' : 'text-slate-600 hover:text-slate-300'}`}
+              >
+                <FileText size={10} /> Notes
+              </button>
+              <button
+                onClick={() => setSidebarTab('library')}
+                className={`flex items-center gap-1 px-2.5 py-1 transition-all ${sidebarTab === 'library' ? 'bg-nebula-500/20 text-nebula-300' : 'text-slate-600 hover:text-slate-300'}`}
+              >
+                <Library size={10} /> Library
+              </button>
+            </div>
+            {sidebarTab === 'notes' && (
+              <button
+                onClick={handleNewNote}
+                title="New note"
+                className="w-5 h-5 rounded-md flex items-center justify-center text-slate-500 hover:text-white transition-colors"
+                style={{ background: 'rgba(255,255,255,0.06)' }}
+              >
+                <Plus size={12} />
+              </button>
+            )}
           </div>
           <div className="relative">
             <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-700" />
@@ -217,50 +243,89 @@ export function NoteEditorPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-32 gap-2">
-              <FileText size={18} className="text-slate-700" />
-              <p className="text-xs text-slate-700">No notes yet</p>
-              <button onClick={handleNewNote} className="text-[11px] text-nebula-400 hover:text-nebula-300">
-                New note →
-              </button>
-            </div>
-          ) : (
-            filtered.map(note => (
-              <button
-                key={note.id}
-                onClick={() => setActiveId(note.id)}
-                className="w-full text-left px-3 py-2.5 group relative"
-                style={note.id === activeId
-                  ? { background: 'rgba(124,58,237,0.12)', borderLeft: '2px solid rgba(124,58,237,0.5)' }
-                  : { borderLeft: '2px solid transparent' }
-                }
-              >
-                <div className="flex items-center justify-between">
-                  <p className={`text-xs font-medium truncate flex-1 ${note.id === activeId ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>
-                    {note.title || 'Untitled'}
+          {sidebarTab === 'notes' ? (
+            filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-32 gap-2">
+                <FileText size={18} className="text-slate-700" />
+                <p className="text-xs text-slate-700">No notes yet</p>
+                <button onClick={handleNewNote} className="text-[11px] text-nebula-400 hover:text-nebula-300">
+                  New note →
+                </button>
+              </div>
+            ) : (
+              filtered.map(note => (
+                <button
+                  key={note.id}
+                  onClick={() => { setActiveId(note.id); setViewChunk(null) }}
+                  className="w-full text-left px-3 py-2.5 group relative"
+                  style={note.id === activeId && !viewChunk
+                    ? { background: 'rgba(124,58,237,0.12)', borderLeft: '2px solid rgba(124,58,237,0.5)' }
+                    : { borderLeft: '2px solid transparent' }
+                  }
+                >
+                  <div className="flex items-center justify-between">
+                    <p className={`text-xs font-medium truncate flex-1 ${note.id === activeId && !viewChunk ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>
+                      {note.title || 'Untitled'}
+                    </p>
+                    <button
+                      onClick={e => {
+                        e.stopPropagation()
+                        const next = notes.find(n => n.id !== note.id)?.id ?? null
+                        if (activeId === note.id) setActiveId(next)
+                        deleteNote(note.id)
+                      }}
+                      className="opacity-0 group-hover:opacity-100 text-slate-700 hover:text-red-400 transition-all ml-1"
+                    >
+                      <Trash2 size={10} />
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-700 mt-0.5 truncate">
+                    {note.content.slice(0, 55) || 'Empty'}
                   </p>
-                  <button
-                    onClick={e => {
-                      e.stopPropagation()
-                      const next = notes.find(n => n.id !== note.id)?.id ?? null
-                      if (activeId === note.id) setActiveId(next)
-                      deleteNote(note.id)
-                    }}
-                    className="opacity-0 group-hover:opacity-100 text-slate-700 hover:text-red-400 transition-all ml-1"
-                  >
-                    <Trash2 size={10} />
-                  </button>
-                </div>
-                <p className="text-[10px] text-slate-700 mt-0.5 truncate">
-                  {note.content.slice(0, 55) || 'Empty'}
-                </p>
-                <div className="flex items-center gap-1 mt-0.5">
-                  <Clock size={8} className="text-slate-800" />
-                  <span className="text-[9px] text-slate-800">{formatRelative(note.updated_at)}</span>
-                </div>
-              </button>
-            ))
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <Clock size={8} className="text-slate-800" />
+                    <span className="text-[9px] text-slate-800">{formatRelative(note.updated_at)}</span>
+                  </div>
+                </button>
+              ))
+            )
+          ) : (
+            importedChunks.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-32 gap-2">
+                <Library size={18} className="text-slate-700" />
+                <p className="text-xs text-slate-700">No imported chunks</p>
+              </div>
+            ) : (
+              importedChunks
+                .filter(c => !search || c.content.toLowerCase().includes(search) || (c.source_file ?? '').toLowerCase().includes(search))
+                .map(chunk => {
+                  const color = retentionToColor(chunk.retention ?? 0.5)
+                  const baseName = (chunk.source_file ?? '').split(/[\\/]/).pop() ?? chunk.chunk_id
+                  const isActive = viewChunk?.chunk_id === chunk.chunk_id
+                  return (
+                    <button
+                      key={chunk.chunk_id}
+                      onClick={() => setViewChunk(chunk)}
+                      className="w-full text-left px-3 py-2.5 group relative"
+                      style={isActive
+                        ? { background: 'rgba(124,58,237,0.12)', borderLeft: `2px solid ${color}` }
+                        : { borderLeft: '2px solid transparent' }
+                      }
+                    >
+                      <p className={`text-xs font-medium truncate ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>
+                        {baseName}
+                      </p>
+                      <p className="text-[10px] text-slate-700 mt-0.5 truncate">
+                        {chunk.content.slice(0, 55)}
+                      </p>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
+                        <span className="text-[9px] font-mono" style={{ color }}>{Math.round((chunk.retention ?? 0.5) * 100)}%</span>
+                      </div>
+                    </button>
+                  )
+                })
+            )
           )}
         </div>
 
@@ -274,9 +339,37 @@ export function NoteEditorPage() {
         </div>
       </aside>
 
-      {/* ── Editor ────────────────────────────────────────────────────── */}
+      {/* ── Editor / Chunk viewer ─────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
-        {active ? (
+        {viewChunk ? (
+          <>
+            <div
+              className="flex items-center justify-between px-5 py-2 shrink-0"
+              style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(5,8,16,0.5)' }}
+            >
+              <div className="flex items-center gap-2">
+                <Library size={13} className="text-nebula-400" />
+                <span className="text-xs text-slate-300 font-medium">
+                  {(viewChunk.source_file ?? '').split(/[\\/]/).pop()}
+                </span>
+                <span className="text-[10px] font-mono text-slate-600">
+                  {Math.round((viewChunk.retention ?? 0.5) * 100)}% retention · {viewChunk.access_count}× reviewed
+                </span>
+              </div>
+              <button onClick={() => setViewChunk(null)} className="text-slate-600 hover:text-white transition-colors">
+                <X size={14} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <div className="max-w-2xl mx-auto px-8 pt-10 pb-20">
+                <h1 className="text-[2rem] font-bold text-white mb-6 leading-tight">
+                  {(viewChunk.source_file ?? '').split(/[\\/]/).pop()}
+                </h1>
+                <p className="text-slate-300 leading-8 whitespace-pre-wrap text-base">{viewChunk.content}</p>
+              </div>
+            </div>
+          </>
+        ) : active ? (
           <>
             {/* Top bar */}
             <div

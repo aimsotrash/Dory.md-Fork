@@ -11,9 +11,10 @@ interface ChunkCardProps {
   highlight?: string;
   compact?: boolean;
   className?: string;
+  onClick?: () => void;
 }
 
-export function ChunkCard({ chunk, score, highlight, compact, className }: ChunkCardProps) {
+export function ChunkCard({ chunk, score, highlight, compact, className, onClick }: ChunkCardProps) {
   const ref = useRef<HTMLDivElement>(null);
   const retention = chunk.retention ?? 0.5;
   const color = retentionToColor(retention);
@@ -47,6 +48,7 @@ export function ChunkCard({ chunk, score, highlight, compact, className }: Chunk
     >
       <div
         className="gcard gcard-spotlight relative overflow-hidden cursor-pointer"
+        onClick={onClick}
         style={{
           borderColor: `rgba(255,255,255,0.06)`,
           transition: 'border-color 0.25s ease, box-shadow 0.25s ease',

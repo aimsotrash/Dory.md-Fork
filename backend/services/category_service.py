@@ -26,6 +26,18 @@ def _hash(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
+def classify_all_uncategorized() -> None:
+    """Classify every chunk that has no category. Safe to call from a background thread at startup."""
+    from database.db import get_all_chunks
+    rows = get_all_chunks()
+    uncategorized = [r for r in rows if not r["category"]]
+    for row in uncategorized:
+        try:
+            classify_and_store(row["id"], row["content"])
+        except Exception:
+            pass
+
+
 def classify_and_store(chunk_id: str, content: str) -> None:
     key = _hash(content)
     if key in _cache:

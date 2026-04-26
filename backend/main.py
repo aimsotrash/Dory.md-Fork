@@ -1,4 +1,5 @@
 import os
+import threading
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -10,11 +11,13 @@ load_dotenv()
 from core.embeddings import warm_model
 from database.db import init_db
 from routers import chunks, discovery, fading, health, ingest, notion, quiz, review, search, stats
+from services.category_service import classify_all_uncategorized
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     warm_model()
+    threading.Thread(target=classify_all_uncategorized, daemon=True).start()
     yield
 
 app = FastAPI(title="Dory.md API", version="1.0.0", lifespan=lifespan)
