@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { KnowledgeHealthTreemap } from '@/components/dashboard/KnowledgeHealthTreemap';
 import { TimeMachineSlider } from '@/components/dashboard/TimeMachineSlider';
 import { StatsRow } from '@/components/dashboard/StatsRow';
@@ -6,15 +6,51 @@ import { RetentionChart } from '@/components/dashboard/RetentionChart';
 import { ChunkCard } from '@/components/chunks/ChunkCard';
 import { Link } from 'react-router-dom';
 import { ArrowRight, BrainCircuit, Sparkles } from 'lucide-react';
-import mockChunks from '@/data/mock_chunks.json';
-import type { Chunk } from '@/lib/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { getFading, getStats } from '@/lib/api';
+import type { BackendChunk, StatsResponse } from '@/lib/types';
+import type { Chunk, Category } from '@/lib/types';
 
-const fadingChunks = (mockChunks as Chunk[])
-  .filter((c) => (c.retention ?? 1) < 0.5)
-  .slice(0, 3);
+function toChunk(c: BackendChunk): Chunk {
+  const cat = (c.category ?? '').toLowerCase();
+  const category: Category =
+    cat.includes('computer') || cat.includes('technical') || cat.includes('code') || cat.includes('algorithm') || cat.includes('math') || cat.includes('data') || cat.includes('design')
+      ? 'technical'
+      : cat.includes('personal')
+      ? 'personal'
+      : cat.includes('reference')
+      ? 'reference'
+      : 'general';
+
+  return {
+    id: c.chunk_id,
+    content: c.content,
+    source_type: 'file',
+    source_name: c.source_file,
+    category,
+    created_at: c.last_accessed,
+    last_accessed: c.last_accessed,
+    access_count: c.access_count,
+    stability_S: 1,
+    complexity_k: 1,
+    retention: c.retention,
+  };
+}
 
 export function Dashboard() {
+  const { user } = useAuth();
   const [timeOffset, setTimeOffset] = useState(0);
+  const [fadingChunks, setFadingChunks] = useState<Chunk[]>([]);
+  const [stats, setStats] = useState<StatsResponse | null>(null);
+
+  const firstName = user?.name?.split(' ')[0] ?? 'there';
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+
+  useEffect(() => {
+    getFading(5).then(r => setFadingChunks(r.chunks.map(toChunk))).catch(() => {});
+    getStats().then(setStats).catch(() => {});
+  }, []);
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -35,11 +71,20 @@ export function Dashboard() {
             </span>
           </div>
           <h1 className="text-3xl font-black text-white tracking-tight leading-none">
-            Good morning,{' '}
-            <span className="text-gradient-nebula">Shraddha</span>
+            {greeting},{' '}
+            <span className="text-gradient-nebula">{firstName}</span>
           </h1>
           <p className="text-slate-500 text-sm">
-            Your knowledge base has <span className="text-slate-300 font-medium">90 memories</span> — 12 are fading right now.
+            {stats ? (
+              <>
+                Your knowledge base has{' '}
+                <span className="text-slate-300 font-medium">{stats.total_chunks} memories</span>
+                {stats.fading > 0 && <> — <span className="text-flare-400 font-medium">{stats.fading} are fading</span> right now.</>}
+                {stats.fading === 0 && <> — all memories are strong.</>}
+              </>
+            ) : (
+              'Loading your knowledge base...'
+            )}
           </p>
         </div>
 

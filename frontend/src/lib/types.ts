@@ -121,3 +121,28 @@ export interface NotionImportResponse {
   pages_imported: number;
   chunks_created: number;
 }
+
+export interface BackendChunk {
+  chunk_id: string;
+  content: string;
+  source_file: string;
+  category: string | null;
+  retention: number;
+  status: string;
+  last_accessed: string;
+  access_count: number;
+}
+
+export interface FadingResponse {
+  chunks: BackendChunk[];
+  total_fading: number;
+}
+
+export interface StatsResponse {
+  total_chunks: number;
+  avg_retention: number;
+  strong: number;
+  fading: number;
+  weak: number;
+  critical: number;
+}

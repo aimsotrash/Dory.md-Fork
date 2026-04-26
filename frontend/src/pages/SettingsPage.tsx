@@ -1,10 +1,12 @@
 import {
   Settings, Brain, Bell, Clock, Shield, Palette,
-  ToggleLeft, ToggleRight, ChevronRight, Info,
+  ToggleLeft, ToggleRight, ChevronRight, Info, LogOut, User,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useTheme, type Theme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Toggle {
   label: string;
@@ -37,6 +39,13 @@ function ToggleRow({
 
 export function SettingsPage() {
   const { theme, setTheme } = useTheme();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  function handleLogout() {
+    logout();
+    navigate('/login');
+  }
 
   const [toggles, setToggles] = useState({
     discoveryPolling: true,
@@ -186,6 +195,29 @@ export function SettingsPage() {
               )}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Account */}
+      <div className="gcard p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md bg-nebula-500/10 flex items-center justify-center">
+            <User size={13} className="text-nebula-400" />
+          </div>
+          <h2 className="text-sm font-semibold text-slate-200">Account</h2>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm text-slate-200">{user?.name}</p>
+            <p className="text-xs text-slate-500 mt-0.5">{user?.email}</p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-red-400 border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 transition-all duration-200"
+          >
+            <LogOut size={12} />
+            Sign out
+          </button>
         </div>
       </div>
 

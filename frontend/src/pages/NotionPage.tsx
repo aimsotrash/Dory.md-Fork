@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { notionStatus, notionConnect, listNotionPages, importNotionPages, ingestFile } from '@/lib/api'
 import type { NotionStatus, NotionPage } from '@/lib/types'
+import { config } from '@/lib/config'
 
 export function NotionPage() {
   const [params] = useSearchParams()
@@ -44,7 +45,7 @@ export function NotionPage() {
   }
 
   async function handleOAuthConnect() {
-    window.location.href = 'http://localhost:8000/auth/notion'
+    window.location.href = `${config.apiBaseUrl}/auth/notion`
   }
 
   async function handleTokenConnect() {
@@ -64,7 +65,7 @@ export function NotionPage() {
   }
 
   async function handleDisconnect() {
-    await fetch('http://localhost:8000/auth/notion', { method: 'DELETE' })
+    await fetch(`${config.apiBaseUrl}/auth/notion`, { method: 'DELETE' })
     setStatus(s => s ? { ...s, connected: false, workspace: undefined } : s)
     setPages([])
     setSelected(new Set())

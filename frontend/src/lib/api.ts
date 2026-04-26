@@ -1,5 +1,6 @@
 import { config } from './config';
 import type {
+  Chunk,
   HealthResponse,
   DiscoveryResponse,
   SearchResponse,
@@ -12,6 +13,8 @@ import type {
   NotionPage,
   NotionConnectResponse,
   NotionImportResponse,
+  FadingResponse,
+  StatsResponse,
 } from './types';
 
 import mockHealth from '@/data/mock_health.json';
@@ -71,9 +74,9 @@ export async function getDiscovery(): Promise<DiscoveryResponse> {
 export async function search(query: string): Promise<SearchResponse> {
   if (config.useMocks) {
     await sleep(400);
-    const results = (mockChunks as typeof mockChunks).filter((c) =>
+    const results = (mockChunks as Chunk[]).filter((c) =>
       c.content.toLowerCase().includes(query.toLowerCase()) ||
-      (c.tags ?? []).some((t) => t.toLowerCase().includes(query.toLowerCase()))
+      (c.tags ?? []).some((t: string) => t.toLowerCase().includes(query.toLowerCase()))
     );
     return {
       results: results.map((c) => ({ chunk: c as SearchResponse['results'][0]['chunk'], score: 0.9, highlight: undefined })),
@@ -121,6 +124,14 @@ export async function submitQuiz(
     method: 'POST',
     body: JSON.stringify({ answers }),
   });
+}
+
+export async function getFading(limit = 200): Promise<FadingResponse> {
+  return apiFetch<FadingResponse>(`/api/fading?limit=${limit}`);
+}
+
+export async function getStats(): Promise<StatsResponse> {
+  return apiFetch<StatsResponse>('/api/stats');
 }
 
 export async function ingestText(

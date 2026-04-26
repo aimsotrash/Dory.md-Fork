@@ -1,17 +1,54 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChunkCard } from '@/components/chunks/ChunkCard';
-import mockChunks from '@/data/mock_chunks.json';
-import type { Chunk, Category } from '@/lib/types';
+import { getFading } from '@/lib/api';
+import type { BackendChunk, Category } from '@/lib/types';
+import type { Chunk } from '@/lib/types';
 import { categoryColors } from '@/styles/theme';
-import { BookOpen, SlidersHorizontal } from 'lucide-react';
+import { BookOpen, SlidersHorizontal, Loader2 } from 'lucide-react';
 
 const ALL_CATEGORIES: Category[] = ['technical', 'personal', 'reference', 'general'];
+
+function toChunk(c: BackendChunk): Chunk {
+  const cat = (c.category ?? '').toLowerCase();
+  const category: Category =
+    cat.includes('computer') || cat.includes('technical') || cat.includes('code') || cat.includes('algorithm') || cat.includes('math') || cat.includes('data') || cat.includes('design')
+      ? 'technical'
+      : cat.includes('personal')
+      ? 'personal'
+      : cat.includes('reference')
+      ? 'reference'
+      : 'general';
+
+  return {
+    id: c.chunk_id,
+    content: c.content,
+    source_type: 'file',
+    source_name: c.source_file,
+    category,
+    created_at: c.last_accessed,
+    last_accessed: c.last_accessed,
+    access_count: c.access_count,
+    stability_S: 1,
+    complexity_k: 1,
+    retention: c.retention,
+  };
+}
 
 export function LibraryPage() {
   const [filterCat, setFilterCat] = useState<Category | 'all'>('all');
   const [sortBy, setSortBy] = useState<'retention' | 'recent' | 'access'>('retention');
+  const [allChunks, setAllChunks] = useState<Chunk[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const chunks = (mockChunks as Chunk[])
+  useEffect(() => {
+    setLoading(true);
+    getFading(500)
+      .then(r => setAllChunks(r.chunks.map(toChunk)))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const chunks = allChunks
     .filter((c) => filterCat === 'all' || c.category === filterCat)
     .sort((a, b) => {
       if (sortBy === 'retention') return (a.retention ?? 0) - (b.retention ?? 0);
@@ -23,7 +60,9 @@ export function LibraryPage() {
     <div className="max-w-3xl space-y-5">
       <div>
         <h1 className="text-xl font-bold text-white mb-1">Library</h1>
-        <p className="text-sm text-slate-500">All your ingested knowledge chunks</p>
+        <p className="text-sm text-slate-500">
+          {loading ? 'Loading…' : `${allChunks.length} memories in your knowledge base`}
+        </p>
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">
@@ -72,10 +111,18 @@ export function LibraryPage() {
         </div>
       </div>
 
-      {chunks.length === 0 ? (
-        <div className="glass-card p-10 text-center space-y-3">
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 size={22} className="animate-spin text-slate-600" />
+        </div>
+      ) : chunks.length === 0 ? (
+        <div className="gcard p-10 text-center space-y-3">
           <BookOpen size={28} className="text-slate-700 mx-auto" />
-          <p className="text-slate-400 text-sm">No memories in this category yet</p>
+          <p className="text-slate-400 text-sm">
+            {allChunks.length === 0
+              ? 'No memories yet — import files or connect Notion to get started.'
+              : 'No memories in this category yet.'}
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
