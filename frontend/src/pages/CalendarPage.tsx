@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getFading } from '@/lib/api';
+import { getAllChunks } from '@/lib/api';
 import type { BackendChunk } from '@/lib/types';
 import { ChevronLeft, ChevronRight, CalendarDays, Brain, X, BookOpen, AlertTriangle } from 'lucide-react';
 import { Card3D } from '@/components/ui/Card3D';
@@ -19,7 +19,7 @@ function getFirstDayOfWeek(year: number, month: number) {
 // forget_hours = ln(5) * SK
 function predictForgetDate(chunk: BackendChunk): Date {
   const now = Date.now();
-  const lastMs = new Date(chunk.last_accessed).getTime();
+  const lastMs = new Date(chunk.last_accessed_iso).getTime();
   const elapsedHours = Math.max((now - lastMs) / 3_600_000, 0.01);
   const R = Math.max(Math.min(chunk.retention, 0.9999), 0.0001);
   const SK = elapsedHours / -Math.log(R);
@@ -53,7 +53,7 @@ export function CalendarPage() {
   const [openChunk, setOpenChunk] = useState<BackendChunk | null>(null);
 
   useEffect(() => {
-    getFading(500)
+    getAllChunks()
       .then(r => setChunks(r.chunks))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -243,7 +243,7 @@ export function CalendarPage() {
                         {truncate(c.content, 120)}
                       </p>
                       <p className="text-[10px] font-mono text-slate-600 mt-1">
-                        {c.source_file} · {Math.round(c.retention * 100)}% retention now
+                        {c.source_file.split(/[\\/]/).pop()} · {Math.round(c.retention * 100)}% retention now
                       </p>
                     </div>
                     <span className="text-[10px] font-mono shrink-0 mt-0.5" style={{ color }}>
@@ -276,7 +276,7 @@ export function CalendarPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Brain size={14} className="text-nebula-400" />
-                <span className="text-xs font-mono text-slate-400">{openChunk.source_file}</span>
+                <span className="text-xs font-mono text-slate-400">{openChunk.source_file.split(/[\\/]/).pop()}</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs font-mono px-2 py-0.5 rounded-full"

@@ -14,6 +14,7 @@ import type {
   NotionConnectResponse,
   NotionImportResponse,
   FadingResponse,
+  ChunksResponse,
   StatsResponse,
 } from './types';
 
@@ -128,6 +129,10 @@ export async function submitQuiz(
 
 export async function getFading(limit = 200): Promise<FadingResponse> {
   return apiFetch<FadingResponse>(`/api/fading?limit=${limit}`);
+}
+
+export async function getAllChunks(limit = 2000): Promise<ChunksResponse> {
+  return apiFetch<ChunksResponse>(`/api/chunks?limit=${limit}`);
 }
 
 export async function getStats(): Promise<StatsResponse> {

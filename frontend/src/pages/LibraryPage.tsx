@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ChunkCard } from '@/components/chunks/ChunkCard';
-import { getFading } from '@/lib/api';
+import { getAllChunks } from '@/lib/api';
 import type { BackendChunk, Category } from '@/lib/types';
 import type { Chunk } from '@/lib/types';
 import { categoryColors } from '@/styles/theme';
@@ -19,14 +19,17 @@ function toChunk(c: BackendChunk): Chunk {
       ? 'reference'
       : 'general';
 
+  const rawPath = c.source_file ?? '';
+  const baseName = rawPath.split(/[\\/]/).pop() ?? rawPath;
+
   return {
     id: c.chunk_id,
     content: c.content,
     source_type: 'file',
-    source_name: c.source_file,
+    source_name: baseName,
     category,
-    created_at: c.last_accessed,
-    last_accessed: c.last_accessed,
+    created_at: c.last_accessed_iso,
+    last_accessed: c.last_accessed_iso,
     access_count: c.access_count,
     stability_S: 1,
     complexity_k: 1,
@@ -42,7 +45,7 @@ export function LibraryPage() {
 
   useEffect(() => {
     setLoading(true);
-    getFading(500)
+    getAllChunks()
       .then(r => setAllChunks(r.chunks.map(toChunk)))
       .catch(() => {})
       .finally(() => setLoading(false));

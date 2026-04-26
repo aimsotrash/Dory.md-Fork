@@ -28,7 +28,7 @@ def _time_ago(dt: datetime) -> str:
 
 
 @router.get("/fading", response_model=FadingResponse)
-def get_fading(limit: int = Query(default=20, ge=1, le=100)):
+def get_fading(limit: int = Query(default=20, ge=1, le=2000)):
     rows = get_all_chunks(DEFAULT_USER_ID)
     results: list[ChunkOut] = []
 
@@ -45,6 +45,7 @@ def get_fading(limit: int = Query(default=20, ge=1, le=100)):
                     retention=round(r, 4),
                     status=classify_retention(r),
                     last_accessed=_time_ago(last_accessed),
+                    last_accessed_iso=last_accessed.isoformat(),
                     access_count=row["access_count"],
                 )
             )

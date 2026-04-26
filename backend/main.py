@@ -9,7 +9,7 @@ load_dotenv()
 
 from core.embeddings import warm_model
 from database.db import init_db
-from routers import discovery, fading, health, ingest, notion, quiz, review, search, stats
+from routers import chunks, discovery, fading, health, ingest, notion, quiz, review, search, stats
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -35,6 +35,7 @@ app.add_middleware(
 
 app.include_router(ingest.router, prefix="/api")
 app.include_router(fading.router, prefix="/api")
+app.include_router(chunks.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
 app.include_router(discovery.router, prefix="/api")
 app.include_router(health.router, prefix="/api")

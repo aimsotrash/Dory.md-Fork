@@ -21,13 +21,19 @@ class ChunkOut(BaseModel):
     category: Optional[str]
     retention: float
     status: str  # strong | fading | weak | critical
-    last_accessed: str
+    last_accessed: str          # human-readable, e.g. "5mo ago"
+    last_accessed_iso: str      # ISO 8601 for client-side date math
     access_count: int
 
 
 class FadingResponse(BaseModel):
     chunks: list[ChunkOut]
     total_fading: int
+
+
+class ChunksResponse(BaseModel):
+    chunks: list[ChunkOut]
+    total: int
 
 
 # ── Health / Time Machine ─────────────────────────────────────────────────────

@@ -22,14 +22,15 @@ function toChunk(c: BackendChunk): Chunk {
       ? 'reference'
       : 'general';
 
+  const baseName = (c.source_file ?? '').split(/[\\/]/).pop() ?? c.source_file;
   return {
     id: c.chunk_id,
     content: c.content,
     source_type: 'file',
-    source_name: c.source_file,
+    source_name: baseName,
     category,
-    created_at: c.last_accessed,
-    last_accessed: c.last_accessed,
+    created_at: c.last_accessed_iso,
+    last_accessed: c.last_accessed_iso,
     access_count: c.access_count,
     stability_S: 1,
     complexity_k: 1,

@@ -129,13 +129,19 @@ export interface BackendChunk {
   category: string | null;
   retention: number;
   status: string;
-  last_accessed: string;
+  last_accessed: string;      // human-readable "5mo ago"
+  last_accessed_iso: string;  // ISO 8601 for date math
   access_count: number;
 }
 
 export interface FadingResponse {
   chunks: BackendChunk[];
   total_fading: number;
+}
+
+export interface ChunksResponse {
+  chunks: BackendChunk[];
+  total: number;
 }
 
 export interface StatsResponse {
