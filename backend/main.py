@@ -11,7 +11,7 @@ load_dotenv(Path(__file__).parent / ".env")
 
 from core.embeddings import warm_model
 from database.db import init_db
-from routers import ai, auth, chunks, discovery, fading, health, ingest, notion, quiz, review, search, stats
+from routers import ai, auth, chunks, discovery, fading, health, ingest, notion, quiz, review, search, seed, stats
 from routers.auth import setup_demo_user
 from services.category_service import classify_all_uncategorized
 
@@ -49,6 +49,7 @@ app.include_router(health.router, prefix="/api")
 app.include_router(review.router, prefix="/api")
 app.include_router(stats.router, prefix="/api")
 app.include_router(quiz.router, prefix="/api")
+app.include_router(seed.router, prefix="/api")
 app.include_router(notion.router)
 
 @app.get("/")

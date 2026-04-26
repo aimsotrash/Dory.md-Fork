@@ -50,7 +50,6 @@ export function QuizPage() {
         setLoading(true);
         try {
           const res = await submitQuiz(session.session_id, newAnswers);
-          
           try {
             const historyObj = JSON.parse(localStorage.getItem('dory_quiz_history') ?? '[]');
             historyObj.push({
@@ -62,7 +61,6 @@ export function QuizPage() {
           } catch (err) {
             console.error('Failed to save quiz history', err);
           }
-
           setResults(res);
           setPhase('results');
         } catch (e) {

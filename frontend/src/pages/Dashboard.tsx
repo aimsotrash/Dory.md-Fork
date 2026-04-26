@@ -5,7 +5,7 @@ import { StatsRow } from '@/components/dashboard/StatsRow';
 import { RetentionChart } from '@/components/dashboard/RetentionChart';
 import { ChunkCard } from '@/components/chunks/ChunkCard';
 import { Link } from 'react-router-dom';
-import { ArrowRight, BrainCircuit, Sparkles } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Zap } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getFading, getStats } from '@/lib/api';
 import type { BackendChunk, StatsResponse } from '@/lib/types';
@@ -54,52 +54,33 @@ export function Dashboard() {
   }, []);
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-5">
 
       {/* Hero */}
-      <div className="flex items-end justify-between gap-4">
+      <div className="flex items-center justify-between gap-4">
         <div className="space-y-1">
-          <div className="flex items-center gap-2 mb-2">
-            <span
-              className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full uppercase tracking-widest"
-              style={{
-                background: 'rgba(124,58,237,0.15)',
-                border: '1px solid rgba(124,58,237,0.35)',
-                color: '#a78bfa',
-              }}
-            >
-              Memory OS active
-            </span>
-          </div>
-          <h1 className="text-3xl font-black text-white tracking-tight leading-none">
-            {greeting},{' '}
-            <span className="text-gradient-nebula">{firstName}</span>
+          <p className="text-[10px] font-mono text-slate-600 uppercase tracking-widest">Memory OS active</p>
+          <h1 className="text-2xl font-bold text-white tracking-tight">
+            {greeting}, {firstName}
           </h1>
           <p className="text-slate-500 text-sm">
             {stats ? (
               <>
-                Your knowledge base has{' '}
-                <span className="text-slate-300 font-medium">{stats.total_chunks} memories</span>
-                {stats.fading > 0 && <> — <span className="text-flare-400 font-medium">{stats.fading} are fading</span> right now.</>}
-                {stats.fading === 0 && <> — all memories are strong.</>}
+                <span className="text-slate-400 font-medium">{stats.total_chunks} memories</span>
+                {stats.fading > 0 && <> · <span className="text-amber-400 font-medium">{stats.fading} fading</span></>}
+                {stats.weak > 0 && <> · <span className="text-orange-400 font-medium">{stats.weak} weak</span></>}
+                {stats.critical > 0 && <> · <span className="text-red-400 font-medium">{stats.critical} critical</span></>}
+                {stats.fading === 0 && stats.weak === 0 && stats.critical === 0 && <> · all strong</>}
               </>
             ) : (
-              'Loading your knowledge base...'
+              'Loading...'
             )}
           </p>
         </div>
 
-        <Link
-          to="/quiz"
-          className="hidden sm:flex shrink-0 items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all duration-200 hover:scale-105"
-          style={{
-            background: 'linear-gradient(135deg, #7c3aed 0%, #0891b2 100%)',
-            boxShadow: '0 0 24px rgba(124,58,237,0.4), inset 0 1px 0 rgba(255,255,255,0.15)',
-          }}
-        >
-          <Sparkles size={14} />
+        <Link to="/quiz" className="hidden sm:flex shrink-0 items-center gap-2 corp-btn-primary px-4 py-2">
+          <Zap size={13} />
           Start quiz
-          <ArrowRight size={13} />
         </Link>
       </div>
 
@@ -115,29 +96,20 @@ export function Dashboard() {
           <RetentionChart />
         </div>
 
-        {/* Right — controls + fading */}
+        {/* Right — time machine + fading */}
         <div className="space-y-4">
           <TimeMachineSlider value={timeOffset} onChange={setTimeOffset} />
 
           {/* Fading Now */}
-          <div
-            className="rounded-2xl overflow-hidden"
-            style={{
-              background: 'rgba(255,255,255,0.02)',
-              border: '1px solid rgba(255,255,255,0.06)',
-            }}
-          >
-            <div
-              className="flex items-center justify-between px-4 py-3"
-              style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
-            >
+          <div className="gcard overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/60">
               <div className="flex items-center gap-2">
-                <BrainCircuit size={13} className="text-flare-400" />
-                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Fading now</span>
+                <BrainCircuit size={13} className="text-amber-400" />
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Fading now</span>
               </div>
               <Link
-                to="/search"
-                className="text-[11px] text-nebula-400 hover:text-nebula-300 flex items-center gap-1 font-medium transition-colors"
+                to="/library"
+                className="text-[11px] text-slate-500 hover:text-slate-300 flex items-center gap-1 transition-colors"
               >
                 View all <ArrowRight size={10} />
               </Link>
@@ -148,8 +120,8 @@ export function Dashboard() {
                 <ChunkCard key={chunk.id} chunk={chunk} compact />
               ))}
               {fadingChunks.length === 0 && (
-                <p className="text-xs text-slate-700 text-center py-6">
-                  No memories fading right now 🎉
+                <p className="text-xs text-slate-600 text-center py-6">
+                  No memories fading right now
                 </p>
               )}
             </div>

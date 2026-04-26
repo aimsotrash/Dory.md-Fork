@@ -1,7 +1,7 @@
 import {
   Settings, Brain, Bell, Clock, Shield, Palette,
   ToggleLeft, ToggleRight, ChevronRight, Info, LogOut, User, Plug,
-  RefreshCw, CheckSquare, Square,
+  RefreshCw, CheckSquare, Square, Database,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -247,12 +247,55 @@ function NotionIntegration() {
   );
 }
 
+function DemoDataSection() {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'skipped'>('idle');
+  const [msg, setMsg] = useState('');
+
+  async function handleSeed() {
+    setStatus('loading');
+    try {
+      const res = await fetch(`${config.apiBaseUrl}/api/seed`, { method: 'POST' });
+      const data = await res.json();
+      setMsg(data.message);
+      setStatus(data.seeded > 0 ? 'done' : 'skipped');
+    } catch {
+      setMsg('Could not reach backend.');
+      setStatus('idle');
+    }
+  }
+
+  return (
+    <div className="gcard p-5 space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="w-6 h-6 rounded-md bg-slate-800 flex items-center justify-center">
+          <Database size={13} className="text-slate-400" />
+        </div>
+        <h2 className="text-sm font-semibold text-slate-200">Demo data</h2>
+      </div>
+      <p className="text-xs text-slate-500">
+        Load 25 synthetic memory chunks across strong, fading, weak, and critical retention profiles to populate the dashboard for demos.
+      </p>
+      {msg && (
+        <p className={`text-xs ${status === 'done' ? 'text-green-400' : 'text-slate-400'}`}>{msg}</p>
+      )}
+      <button
+        onClick={handleSeed}
+        disabled={status === 'loading' || status === 'done' || status === 'skipped'}
+        className="corp-btn-secondary text-xs px-3 py-1.5 disabled:opacity-40"
+      >
+        {status === 'loading' ? 'Loading...' : status === 'done' ? 'Loaded' : status === 'skipped' ? 'Already loaded' : 'Load demo data'}
+      </button>
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   function handleLogout() { logout(); navigate('/login'); }
+
 
   const [toggles, setToggles] = useState({
     discoveryPolling: true,
@@ -395,6 +438,9 @@ export function SettingsPage() {
           </button>
         </div>
       </div>
+
+      {/* Demo data */}
+      <DemoDataSection />
 
       {/* About */}
       <div className="gcard p-4 flex items-center gap-3">
